@@ -1,6 +1,8 @@
+import os
+
 import numpy as np
 import pandas as pd
-import os
+
 
 def generar_dataset(n=50000, seed=42):
     """

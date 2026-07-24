@@ -1,8 +1,9 @@
+import os
+
+import joblib
+import numpy as np
 from fastapi import FastAPI
 from pydantic import BaseModel
-import numpy as np
-import joblib
-import os
 
 # ======================================================
 # Carga de scaler y mejor modelo
@@ -15,7 +16,7 @@ scaler = joblib.load(scaler_path)
 
 # Leer nombre del mejor modelo
 mejor_modelo_txt = os.path.join(MODELS_DIR, "mejor_modelo.txt")
-with open(mejor_modelo_txt, "r") as f:
+with open(mejor_modelo_txt) as f:
     mejor_modelo_nombre = f.read().strip()
 
 # Mapear nombre lógico a archivo .pkl
@@ -66,10 +67,10 @@ app = FastAPI(
     title="API Clasificación Hipertensión",
     description=(
         "API para clasificar hipertensión arterial usando un modelo de Machine Learning "
-        "(mejor modelo: {})\n\n"
+        f"(mejor modelo: {mejor_modelo_nombre})\n\n"
         "⚠ AVISO: Esta herramienta es solo para fines educativos y NO reemplaza una "
         "valoración médica profesional."
-    ).format(mejor_modelo_nombre),
+    ),
     version="1.0.0",
 )
 

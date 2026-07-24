@@ -50,6 +50,14 @@ Primera versión funcional del sistema end-to-end.
 
 ### Corregido
 
+- **`src/train_classical_models.py` no ejecutaba con scikit-learn ≥ 1.7**: usaba
+  `multi_class="multinomial"`, parámetro eliminado en esa versión. Detectado por CI
+  con scikit-learn 1.9. Con el solver por defecto (lbfgs) el ajuste ya es
+  multinomial, así que el comportamiento no cambia.
+- `except:` desnudo en el cálculo de ROC-AUC sustituido por `except ValueError` con
+  aviso explícito (DT-8).
+- Imports sin usar y desordenados en `api/`, `app/` y `src/`; variable de bucle sin
+  usar en `app/dashboard.py`. `ruff check` pasa limpio sobre el pipeline activo.
 - `requirements.txt`: eliminadas `lightgbm` y `catboost` (no se importan en ninguna
   parte del código) y añadida `requests`, que el dashboard usa y faltaba declarar.
 - `.gitignore` ampliado para cubrir caches de test, notebooks, secretos y artefactos.

@@ -1,16 +1,14 @@
-import pandas as pd
-import numpy as np
-import joblib
 import os
 
+import joblib
+import pandas as pd
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.linear_model import LogisticRegression
+from sklearn.metrics import accuracy_score, f1_score, roc_auc_score
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler
-from sklearn.metrics import accuracy_score, f1_score, roc_auc_score
-from sklearn.linear_model import LogisticRegression
 from sklearn.svm import SVC
 from sklearn.tree import DecisionTreeClassifier
-from sklearn.ensemble import RandomForestClassifier
-
 from xgboost import XGBClassifier
 
 
@@ -28,7 +26,9 @@ def evaluar_modelo(nombre, modelo, X_test, y_test, y_pred, y_proba):
             y_proba,
             multi_class="ovr"
         )
-    except:
+    except ValueError as exc:
+        # Ocurre si y_proba no cubre todas las clases presentes en y_test.
+        print(f"  [aviso] ROC-AUC no calculable para {nombre}: {exc}")
         roc = None
 
     print(f"\n===== {nombre} =====")
@@ -73,7 +73,9 @@ def main():
     # =======================================================
     # 1. REGRESIÓN LOGÍSTICA
     # =======================================================
-    log_reg = LogisticRegression(max_iter=2000, multi_class="multinomial")
+    # `multi_class="multinomial"` fue eliminado en scikit-learn 1.7. Con el solver
+    # por defecto (lbfgs) y un target multiclase, el ajuste ya es multinomial.
+    log_reg = LogisticRegression(max_iter=2000)
     log_reg.fit(X_train, y_train)
 
     y_pred = log_reg.predict(X_test)

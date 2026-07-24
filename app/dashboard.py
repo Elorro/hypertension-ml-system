@@ -1,9 +1,8 @@
-import streamlit as st
-import pandas as pd
-import numpy as np
-import requests
 import matplotlib.pyplot as plt
+import pandas as pd
+import requests
 import seaborn as sns
+import streamlit as st
 
 API_URL = "http://127.0.0.1:8000/predecir"
 
@@ -162,7 +161,7 @@ with tab_csv:
 
             if st.button("🚀 Clasificar todos los pacientes"):
                 resultados = []
-                for i, row in df.iterrows():
+                for _, row in df.iterrows():
                     payload = {
                         "Edad": int(row["Edad"]),
                         "Sexo": int(row["Sexo"]),
