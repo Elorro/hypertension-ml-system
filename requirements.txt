@@ -1,13 +1,28 @@
-pandas
-numpy
-scikit-learn
-xgboost
-lightgbm
-catboost
-tensorflow
-matplotlib
-seaborn
-streamlit
-fastapi
-uvicorn
-joblib
+# Dependencias del pipeline activo (src/ + api/ + app/)
+# Python 3.12+
+#
+# Los rangos fijan la major version para evitar rupturas de API.
+# Para un entorno exactamente reproducible, generar un lock tras validar:
+#     pip freeze > requirements.lock.txt
+
+# --- Datos y cómputo numérico ---
+numpy>=2.0,<3.0
+pandas>=2.2,<3.0
+
+# --- Machine learning ---
+scikit-learn>=1.5,<2.0
+xgboost>=2.1,<4.0
+joblib>=1.4,<2.0
+
+# --- Visualización ---
+matplotlib>=3.9,<4.0
+seaborn>=0.13,<0.14
+
+# --- Servicio de inferencia ---
+fastapi>=0.115,<1.0
+uvicorn[standard]>=0.30,<1.0
+pydantic>=2.8,<3.0
+
+# --- Dashboard ---
+streamlit>=1.38,<2.0
+requests>=2.32,<3.0

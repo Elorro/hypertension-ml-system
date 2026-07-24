@@ -1,0 +1,28 @@
+cff-version: 1.2.0
+title: "Sistema de Clasificación de Hipertensión Arterial"
+message: "Si utilizas este software, por favor cítalo como se indica."
+type: software
+authors:
+  - family-names: "Araque"
+    given-names: "Luis"
+    email: "luisalfredoaraque@gmail.com"
+repository-code: "https://github.com/Elorro/hypertension-ml-system"
+abstract: >-
+  Sistema end-to-end de machine learning para clasificación de niveles de
+  hipertensión arterial: generación de datos sintéticos, entrenamiento
+  comparativo de cinco algoritmos clásicos, servicio REST de inferencia con
+  FastAPI y dashboard interactivo con Streamlit. El proyecto documenta de forma
+  explícita un caso de target leakage en su dataset sintético y se distribuye
+  como material educativo sobre ingeniería de sistemas de ML, no como
+  herramienta clínica.
+keywords:
+  - machine-learning
+  - hipertension
+  - clasificacion-multiclase
+  - fastapi
+  - streamlit
+  - target-leakage
+  - mlops
+license: MIT
+version: 1.0.0
+date-released: "2026-01-05"

@@ -1,0 +1,81 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Instalar ruff
+        run: pip install ruff
+
+      - name: Verificar estilo
+        run: ruff check .
+        continue-on-error: true   # el código heredado aún no cumple; ver ROADMAP DT-5
+
+  pipeline:
+    name: Pipeline end-to-end
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Instalar dependencias
+        run: pip install -r requirements.txt
+
+      - name: Generar dataset sintético
+        run: python src/generate_dataset.py
+
+      - name: Auditoría de target leakage
+        run: python scripts/verify_leakage.py
+
+      - name: Entrenar modelos
+        run: python src/train_classical_models.py
+
+      - name: Verificar que los artefactos existen
+        run: |
+          test -f models/scaler.pkl
+          test -f models/mejor_modelo.txt
+          echo "Modelo seleccionado: $(cat models/mejor_modelo.txt)"
+
+      - name: Verificar que el servicio arranca
+        run: |
+          python -c "from api.main import app; print('Servicio importado correctamente')"
+
+  test:
+    name: Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Instalar dependencias
+        run: pip install -r requirements.txt -r requirements-dev.txt
+
+      - name: Ejecutar tests
+        run: |
+          if [ -d tests ]; then
+            pytest -v --cov=src --cov=api --cov-report=term-missing
+          else
+            echo "Sin suite de tests todavía — ver ROADMAP DT-6"
+          fi

@@ -1,0 +1,112 @@
+# CLAUDE.md — hypertension_ml
+
+Contexto para agentes de IA que trabajen en este repositorio.
+Complementa las reglas globales de `~/.claude/CLAUDE.md`.
+
+---
+
+## Qué es este proyecto
+
+Sistema end-to-end de clasificación de hipertensión arterial en 4 niveles.
+Pipeline: generación de datos → entrenamiento comparativo de 5 modelos → servicio
+FastAPI → dashboard Streamlit.
+
+**Naturaleza real del proyecto:** demostración de ingeniería de ML, no herramienta
+clínica. Ver la sección de estado antes de proponer cualquier trabajo.
+
+## Fase actual
+
+**Fase 3 (prototipo) con la compuerta de Fase 2 sin superar.**
+
+El sistema corre end-to-end, pero la validación matemática **falló** y el defecto
+sigue abierto. No proponer optimización de hiperparámetros, modelos nuevos ni
+despliegue hasta cerrar DT-1.
+
+| Fase | Estado |
+|------|--------|
+| 1. Diseño | ✅ Completa |
+| 2. Validación matemática | ❌ **Falla detectada — target leakage** |
+| 3. Prototipo | ✅ Funcional |
+| 4. Testing | ⬜ No iniciada |
+
+## El defecto que domina todo lo demás
+
+El target del dataset sintético es una **función determinista de las features**.
+`Diagnostico` se calcula con umbrales sobre `PAS`/`PAD`, y esas mismas columnas se
+entregan al modelo como entrada.
+
+Verificación: `python scripts/verify_leakage.py`
+
+```
+Baseline clase mayoritaria    → 29,61 %
+Regla PAS/PAD pura            → 61,87 %
+Regla completa del generador  → 91,09 %
+```
+
+Un `if` de doce líneas recupera el 91 % de las etiquetas. El 9 % restante es ruido
+de redondeo del CSV, no señal. **Cualquier métrica de accuracy en este proyecto es
+tautológica.** Análisis completo en `docs/LEAKAGE_ANALYSIS.md`.
+
+Implicación operativa: no reportar accuracy/F1 sin acompañarlo del baseline de la
+regla clínica. No presentar el sistema como predictor de hipertensión.
+
+## Estructura y qué está vivo
+
+**Pipeline activo:**
+
+```
+src/generate_dataset.py         → data/raw/dataset_hipertension_sintetico.csv
+src/train_classical_models.py   → models/*.pkl + scaler.pkl + mejor_modelo.txt
+api/main.py                     → FastAPI :8000
+app/dashboard.py                → Streamlit :8501 (cliente HTTP del servicio)
+```
+
+**Pipeline heredado — no tocar sin decisión previa:**
+
+`data_pipeline.py`, `train_models.py`, `model_utils.py`, `streamlit_app.py`,
+`chatbot_cli.py` en la raíz. Esquema incompatible (`HTA_Nivel` vs `Diagnostico`,
+`Estrés` con tilde vs `Estres` sin tilde). Además `train_models.py` **no ejecuta con
+scikit-learn ≥ 1.4** (`base_estimator` fue eliminado de `CalibratedClassifierCV`).
+
+Antes de modificar cualquier archivo de la raíz, confirmar con Luis si se migra
+(DT-5 opción b) o se elimina (opción a).
+
+## Convenciones no negociables
+
+- **Semillas fijas.** `random_state=42` / `seed=42` en toda operación aleatoria.
+- **`Estres` sin tilde** en el pipeline activo. Con tilde solo en el heredado.
+- **Orden de features acoplado** entre 4 archivos + docs. Cambiarlo exige tocarlos
+  todos a la vez; ver `CONTRIBUTING.md`.
+- **Nunca versionar** `.pkl`, CSV generados ni el `.venv`.
+- **Avisos médicos** presentes en servicio, dashboard y docs. No retirarlos.
+- Documentación y docstrings en español; nombres de código en el idioma que ya usa
+  cada archivo.
+
+## Comandos
+
+```bash
+make setup       # dataset + entrenamiento (prerrequisito del servicio)
+make api         # uvicorn :8000
+make dashboard   # streamlit :8501
+make audit       # auditoría de leakage
+make test        # pytest (suite aún no existe — DT-6)
+make lint        # ruff
+```
+
+El servicio carga el modelo en tiempo de import: sin `models/` poblado, `uvicorn`
+falla al arrancar.
+
+## Trabajo pendiente
+
+Priorizado en `docs/ROADMAP.md` con IDs `DT-N`. El orden importa: DT-1 a DT-4 son
+bloqueantes y nada posterior tiene sentido sin ellos.
+
+Siguiente hito concreto (DT-1): reentrenar sobre `data/real/cardio/cardio_train.csv`
+definiendo el target desde `ap_hi`/`ap_lo` y **excluyendo esas dos columnas de las
+features**. Convierte el problema en genuinamente predictivo.
+
+## Fuente de verdad
+
+`BITACORA.md` registra el estado real y las decisiones tomadas. Ante cualquier duda
+sobre en qué punto está el proyecto, leer su última entrada antes de proponer
+trabajo.
