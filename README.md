@@ -144,11 +144,29 @@ Referencia completa de endpoints y esquemas en **[docs/API.md](docs/API.md)**.
 La selección se hace por **macro-F1** sobre el conjunto de test y el ganador se
 persiste en `models/mejor_modelo.txt`, que el servicio lee al arrancar.
 
-**Por qué este README no publica una tabla de accuracy:** dado el leakage descrito
-arriba, cualquier métrica alta mide la capacidad de memorizar un umbral, no de
-predecir. El único número informativo es la comparación contra el **baseline de la
-regla clínica** (clasificar solo con `PAS`/`PAD`), y por construcción ningún modelo
-puede superarlo de forma significativa. Ver
+### Resultados, y cómo leerlos
+
+| Modelo | Accuracy | Macro-F1 |
+|--------|----------|----------|
+| Regresión Logística | 47,70 % | 0,4711 |
+| SVM RBF | 68,82 % | 0,6961 |
+| Árbol de Decisión (`max_depth=8`) | 94,83 % | 0,9497 |
+| Random Forest (300 árboles) | 94,84 % | 0,9498 |
+| **XGBoost (400 árboles)** | **95,32 %** | **0,9547** |
+
+Ese 95,3 % **no se lee contra el 29,6 % del azar, sino contra el 91,1 % que alcanza
+una regla `if` de doce líneas sin entrenamiento** — la misma que generó las
+etiquetas. Y la tabla contiene dos señales del defecto:
+
+- **Un árbol de profundidad 8 llega a 94,83 %**, a medio punto de 400 árboles
+  boosteados. Cuando el gradient boosting no se despega de un modelo trivial, no
+  queda estructura estadística que extraer.
+- **Los modelos lineales y de kernel se hunden a 48–69 %** mientras los de árboles
+  rondan el 95 %. El target es una partición por umbrales: los árboles la
+  representan nativamente, los lineales no pueden. La geometría del problema es la
+  de un `if`.
+
+Análisis completo en [docs/LEAKAGE_ANALYSIS.md](docs/LEAKAGE_ANALYSIS.md) y
 [docs/MODEL_CARD.md](docs/MODEL_CARD.md).
 
 ---

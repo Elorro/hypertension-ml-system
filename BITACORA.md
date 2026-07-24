@@ -8,6 +8,69 @@ Formato: entradas descendentes (lo más reciente arriba).
 
 ---
 
+## 2026-07-24 (tarde) — CI en rojo: pipeline roto con scikit-learn moderno
+
+**Fase:** 3 (prototipo)
+
+### Qué pasó
+
+El primer push activó el CI recién añadido y el job `pipeline` falló en el paso
+"Entrenar modelos". El token de `gh` está vencido (403 al pedir los logs), así que
+se reprodujo localmente en un venv limpio.
+
+**Causa raíz:** `src/train_classical_models.py` pasaba `multi_class="multinomial"` a
+`LogisticRegression`. El parámetro fue deprecado en scikit-learn 1.5 y **eliminado
+en la 1.7**; el runner instaló la 1.9.0. Es el mismo tipo de defecto ya documentado
+para `train_models.py` en la raíz, pero este estaba en el pipeline activo.
+
+Corregido eliminando el parámetro: con el solver por defecto (lbfgs) y target
+multiclase, el ajuste ya es multinomial. Comportamiento idéntico.
+
+### Evidencia empírica del leakage
+
+Entrenamiento completo ejecutado tras el fix (scikit-learn 1.9, split 80/20):
+
+| Modelo | Accuracy | Macro-F1 |
+|--------|----------|----------|
+| Regresión Logística | 47,70 % | 0,4711 |
+| SVM RBF | 68,82 % | 0,6961 |
+| Árbol de Decisión (`max_depth=8`) | 94,83 % | 0,9497 |
+| Random Forest (300 árboles) | 94,84 % | 0,9498 |
+| XGBoost (400 árboles) | 95,32 % | 0,9547 |
+
+Los números confirman el diagnóstico de la mañana por dos vías independientes:
+
+1. **Brecha entre familias.** Árboles ~95 % vs. lineales/kernel 48–69 %. El target es
+   una partición por umbrales; los árboles la representan nativamente y los lineales
+   no pueden. La geometría del problema es la de un `if`.
+2. **Un árbol de profundidad 8 empata con 400 boosteados.** 94,83 % vs. 95,32 %.
+   Cuando el gradient boosting no se despega de un modelo trivial, no queda
+   estructura que extraer.
+
+**Corrección a la entrada anterior:** se afirmó que ningún modelo superaría el
+91,09 % de la reconstrucción manual. XGBoost lo superó por 4,2 pp. Motivo: la
+reconstrucción arrastra el ruido de redondeo del CSV, mientras que el modelo aprende
+sobre los valores redondeados que efectivamente observa. El 91,09 % es el techo de
+la reconstrucción, no del problema; el techo efectivo ronda el 95–96 %.
+
+### Otros cambios
+
+- Cerrado **DT-8**: `except:` desnudo → `except ValueError` con aviso explícito.
+- Limpieza de lint: imports sin usar y desordenados en `api/`, `app/`, `src/`, y
+  variable de bucle sin usar en `dashboard.py`. `ruff check` pasa limpio (10 → 0).
+- Nuevo **DT-17**: `SVC(probability=True)` quedó deprecado en scikit-learn 1.9 y se
+  elimina en la 1.11. Como `requirements.txt` admite `<2.0`, el pipeline se romperá
+  solo. No se aplicó el cambio porque altera el tipo del artefacto `modelo_svm.pkl`.
+- Medido el coste del SVM-RBF: O(n²), ~4 min sobre 40.000 filas de entrenamiento
+  (0,60 s con n=2.000 → 9,07 s con n=8.000). Domina el tiempo total del pipeline.
+
+### Estado al cierre
+
+Pipeline completo verificado end-to-end en local con scikit-learn 1.9. Lint limpio.
+Pendiente de push y de confirmar el CI en verde.
+
+---
+
 ## 2026-07-24 — Auditoría metodológica y documentación del repositorio
 
 **Fase:** 3 (prototipo) · **Compuerta de Fase 2 (validación matemática): NO superada**

@@ -64,10 +64,22 @@ Evidencia cuantitativa, reproducible con `python scripts/verify_leakage.py`:
 | Baseline clase mayoritaria | 29,6 % |
 | **Regla `if` sobre PAS/PAD, sin entrenamiento** | **61,9 %** |
 | **Regla completa del generador, sin entrenamiento** | **91,1 %** |
+| Regresión Logística (entrenada) | 47,7 % |
+| SVM RBF (entrenada) | 68,8 % |
+| Árbol de Decisión, `max_depth=8` (entrenado) | 94,8 % |
+| Random Forest, 300 árboles (entrenado) | 94,8 % |
+| XGBoost, 400 árboles (entrenado) | 95,3 % |
 
-Cualquier modelo entrenado compite contra ese 91,1 %, no contra el 29,6 %. Y no
-puede superarlo de forma significativa, porque el 8,9 % restante es ruido de
-redondeo introducido al escribir el CSV, no señal aprendible.
+Cualquier modelo entrenado compite contra el 91,1 % de la regla escrita a mano, no
+contra el 29,6 % del azar. Leída así, la tabla dice que 400 árboles boosteados
+mejoran unos pocos puntos sobre doce líneas de `if` — y que **un solo árbol de
+profundidad 8 ya alcanza 94,8 %**, a 0,5 puntos del ganador.
+
+El patrón más diagnóstico está en la brecha entre familias: los modelos basados en
+árboles llegan a ~95 % y los lineales o de kernel se quedan en 48–69 %. El target es
+una partición por umbrales; los árboles la representan de forma nativa y los modelos
+lineales no pueden. La geometría del problema es la de un `if`, no la de un fenómeno
+clínico.
 
 Análisis completo en [LEAKAGE_ANALYSIS.md](LEAKAGE_ANALYSIS.md).
 

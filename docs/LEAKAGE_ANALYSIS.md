@@ -64,7 +64,40 @@ Consecuencia directa: **≈91 % es el techo de información útil del dataset, y
 techo lo alcanza un `if`.** Cualquier modelo que reporte accuracy en ese rango no
 ha aprendido nada que no estuviera ya escrito en el generador.
 
-## 3. Por qué esto invalida las métricas
+## 3. Confirmación empírica
+
+Entrenando efectivamente los cinco modelos sobre el dataset (`make train`,
+scikit-learn 1.9, split 80/20):
+
+| Modelo | Accuracy | Macro-F1 | ROC-AUC OVR |
+|--------|----------|----------|-------------|
+| Regresión Logística | 47,70 % | 0,4711 | 0,748 |
+| SVM RBF | 68,82 % | 0,6961 | 0,913 |
+| Árbol de Decisión (`max_depth=8`) | 94,83 % | 0,9497 | 0,997 |
+| Random Forest (300 árboles) | 94,84 % | 0,9498 | 0,998 |
+| XGBoost (400 árboles) | **95,32 %** | **0,9547** | 0,998 |
+
+Dos patrones confirman el diagnóstico:
+
+**a) La brecha entre familias de modelos.** Los métodos basados en árboles alcanzan
+~95 %; los lineales y de kernel se quedan en 48–69 %. Esto es exactamente lo que
+predice la estructura del target: una partición por umbrales sobre `PAS`/`PAD`. Los
+árboles representan cortes rectangulares de forma nativa; un modelo lineal no puede
+expresar esa geometría. La forma del problema **es** un `if`, y la tabla lo delata.
+
+**b) Un árbol de profundidad 8 empata con 400 árboles boosteados.** Un solo
+`DecisionTreeClassifier` logra 94,83 %, y XGBoost con 400 estimadores solo añade
+0,49 puntos. Cuando el gradient boosting no consigue despegarse de un modelo
+trivial, no queda estructura estadística que extraer: solo una regla que memorizar.
+
+**Nota sobre el techo real.** Los modelos superan el 91,09 % de la reconstrucción
+manual de §2 porque esa reconstrucción arrastra el ruido de redondeo del CSV,
+mientras que el modelo aprende directamente sobre los valores redondeados que
+observa. El 91,09 % es el techo de la reconstrucción, no del problema; el techo
+efectivo ronda el 95–96 %, limitado por los casos que el redondeo vuelve ambiguos
+en las fronteras de decisión.
+
+## 4. Por qué esto invalida las métricas
 
 Un accuracy de 0.95 en este dataset no significa "el sistema detecta hipertensión
 con 95 % de acierto". Significa "el sistema memorizó los umbrales de las guías AHA".
@@ -73,14 +106,16 @@ Las implicaciones:
 - **No hay generalización que medir.** No existe distribución poblacional real de la
   cual el modelo esté aprendiendo; se aprende una función determinista conocida.
 - **El baseline correcto no es la clase mayoritaria** (29,6 %), sino la regla clínica
-  misma (91,1 %). Contra ese baseline, la mejora de cualquier modelo es marginal o nula.
+  misma (91,1 % reconstruida a mano, ~95 % como techo efectivo). El 95,3 % de XGBoost
+  se lee contra ese baseline, no contra el 29,6 %: la ganancia real es de unos pocos
+  puntos sobre un `if`, no de 66 puntos sobre el azar.
 - **La importancia de variables es tautológica.** `PAS` y `PAD` dominarán siempre,
   no porque sean predictores clínicos descubiertos, sino porque son la definición.
 - **El modelo no aporta valor sobre un `if`.** Si la etiqueta se computa con dos
   comparaciones, desplegar un XGBoost de 400 árboles para reproducirlas es
   ingeniería innecesaria.
 
-## 4. Defectos metodológicos secundarios
+## 5. Defectos metodológicos secundarios
 
 Encontrados durante la misma auditoría, en orden de severidad:
 
@@ -93,7 +128,7 @@ Encontrados durante la misma auditoría, en orden de severidad:
 | 5 | `except:` desnudo | `train_classical_models.py`, cálculo de ROC-AUC | Silencia cualquier excepción, incluidas las no previstas. |
 | 6 | Sin tests | Todo el repositorio | Ninguna garantía de no-regresión. |
 
-## 5. Cómo se corrige
+## 6. Cómo se corrige
 
 El plan está en [ROADMAP.md](ROADMAP.md). En resumen, dos caminos válidos:
 

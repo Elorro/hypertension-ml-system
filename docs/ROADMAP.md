@@ -134,12 +134,11 @@ verifique `PAD < PAS` y la coherencia de `IMC` con `Peso`/`Talla`.
 **Criterio de aceptación.** Entradas fisiológicamente imposibles devuelven `422` con
 mensaje explicativo.
 
-### 🟡 DT-8 · Manejo de errores y `except` desnudo
+### ✅ DT-8 · Manejo de errores y `except` desnudo — *resuelto*
 
-**Problema.** `src/train_classical_models.py` usa `except:` sin tipo al calcular
-ROC-AUC, silenciando cualquier excepción, incluidas las no previstas.
-
-**Solución.** `except ValueError` con log explícito de la causa.
+`src/train_classical_models.py` usaba `except:` sin tipo al calcular ROC-AUC,
+silenciando cualquier excepción. Sustituido por `except ValueError` con aviso
+explícito de la causa.
 
 ---
 
@@ -161,6 +160,31 @@ clase predicha — sin persistir datos clínicos de entrada.
 `requirements.txt` no fija versiones exactas. Un `pip install` hoy y en seis meses
 producen entornos distintos. Generar un lock con `pip freeze > requirements.lock.txt`
 tras validar que la suite pasa.
+
+### 🟡 DT-17 · `SVC(probability=True)` deprecado
+
+**Problema.** `src/train_classical_models.py` usa `SVC(kernel="rbf", C=2,
+probability=True)`. El parámetro `probability` quedó **deprecado en scikit-learn 1.9
+y se elimina en la 1.11**. Como `requirements.txt` admite `scikit-learn<2.0`, el
+pipeline se romperá solo cuando salga esa versión.
+
+**Solución.** Sustituir por el reemplazo que la propia librería recomienda:
+
+```python
+from sklearn.calibration import CalibratedClassifierCV
+svm = CalibratedClassifierCV(SVC(kernel="rbf", C=2), ensemble=False)
+```
+
+Ojo: cambia el tipo del objeto persistido en `modelo_svm.pkl`, así que hay que
+regenerar el artefacto.
+
+**Contexto de rendimiento.** El SVM-RBF domina el tiempo de entrenamiento: escala
+como O(n²) y sobre las 40.000 filas de entrenamiento tarda ~4 minutos, frente a
+segundos del resto de modelos. Medición: 0,60 s (n=2.000) → 2,23 s (n=4.000) →
+9,07 s (n=8.000).
+
+**Criterio de aceptación.** El entrenamiento completo no emite `FutureWarning` de
+scikit-learn.
 
 ### 🟢 DT-12 · Contenerización
 
