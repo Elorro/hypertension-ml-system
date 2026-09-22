@@ -2,6 +2,14 @@
 
 Formato basado en *Model Cards for Model Reporting* (Mitchell et al., 2019).
 
+> **Alcance de esta ficha.** Describe el modelo **sintético** que sirve `api/main.py`
+> (`models/modelo_*.pkl`), cuyo target es una función determinista de las features.
+> Los modelos entrenados sobre datos reales en DT-1 (`models/dt1_*.pkl`) **no** están
+> cubiertos aquí: son binarios, tienen otro esquema de features y todavía no se
+> exponen en ningún servicio. Sus métricas, límites y criterio de aceptación están en
+> [DT1_RESULTS.md](DT1_RESULTS.md). Esta ficha se reescribirá cuando el servicio
+> migre a esos artefactos (DT-5).
+
 ---
 
 ## Detalles del modelo

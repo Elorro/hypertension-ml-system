@@ -11,27 +11,32 @@ efecto real y el criterio de aceptación que la cierra.
 
 Ninguna conclusión del proyecto es defendible hasta cerrar esta fase.
 
-### 🔴 DT-1 · Eliminar el target leakage
+### ✅ DT-1 · Eliminar el target leakage — *resuelto (2026-09-17)*
 
-**Problema.** El target del dataset sintético es una función determinista de las
-features de entrada. Los modelos reproducen un `if`, no predicen.
-Ver [LEAKAGE_ANALYSIS.md](LEAKAGE_ANALYSIS.md).
+**Problema.** El target del dataset sintético era una función determinista de las
+features de entrada. Ver [LEAKAGE_ANALYSIS.md](LEAKAGE_ANALYSIS.md).
 
-**Solución propuesta.** Migrar el entrenamiento al dataset real
-(`data/real/cardio/cardio_train.csv`, 70.000 pacientes):
+**Qué se hizo.** El entrenamiento migró al dataset real
+(`data/real/cardio/cardio_train.csv`, 70.000 pacientes → 68.678 tras limpieza) en
+[`src/train_cardio_real.py`](../src/train_cardio_real.py), con dos experimentos:
 
-1. Definir el target: `hipertenso = (ap_hi >= 140) | (ap_lo >= 90)`.
-2. **Excluir `ap_hi` y `ap_lo` del conjunto de features.**
-3. Features: edad (en años), sexo, IMC, colesterol, glucosa, tabaquismo, alcohol,
-   actividad física.
-4. Filtrar los valores de presión imposibles antes de derivar el target.
+- **A′** — target `cardio`, con ablación de `ap_hi`/`ap_lo`. Medir la presión vale
+  Δ AUC = 0,1103, IC 95 % [0,1027 · 0,1181] (bootstrap pareado).
+- **B1** — target `hta = (ap_hi ≥ 140) ∨ (ap_lo ≥ 90)` con las dos columnas de
+  presión **excluidas de las features**. AUC 0,6941 [0,6849 · 0,7035].
 
-La pregunta pasa a ser genuina: *¿se puede estimar el estado hipertensivo sin medir
-la presión arterial?* El baseline honesto vuelve a ser la clase mayoritaria.
+**Criterio de aceptación — cumplido.** `python scripts/audit_cardio_leakage.py`:
+la mejor regla determinista sobre las features (árbol CART de profundidad ≤ 3)
+alcanza 67,95 % frente a un baseline de clase mayoritaria de 65,67 %: **+2,28 pp**,
+por debajo del límite de 5 pp. El control positivo de la misma auditoría —las mismas
+reglas con `ap_hi`/`ap_lo` devueltas a las features— llega a 99,27 % (+33,60 pp),
+que es lo que demuestra que el buscador de reglas sí detecta leakage cuando existe.
 
-**Criterio de aceptación.** `scripts/verify_leakage.py` sobre el nuevo dataset
-reporta que ninguna regla determinista sobre las features recupera el target por
-encima del baseline de clase mayoritaria + 5 pp.
+Resultados completos y sus límites: [DT1_RESULTS.md](DT1_RESULTS.md).
+
+**Lo que NO cierra.** El servicio (`api/main.py`) sigue cargando el modelo sintético;
+migrarlo es parte de DT-5. Y las métricas de arriba siguen sesgadas al alza por
+DT-3/DT-4, que continúan abiertos.
 
 ### 🔴 DT-2 · Corregir el escalado antes del split
 
@@ -52,6 +57,11 @@ joblib.dump(pipe, "models/modelo_xgb.pkl")   # un solo artefacto autocontenido
 **Criterio de aceptación.** Ningún `fit` ni `fit_transform` se ejecuta sobre datos
 que incluyan el conjunto de test.
 
+**Estado parcial (2026-09-17).** `src/train_cardio_real.py` ya ajusta el scaler
+exclusivamente sobre train y persiste el `StandardScaler` junto a sus `mean_`/`scale_`
+en el manifiesto. `src/train_classical_models.py` —el que alimenta al servicio— sigue
+con el defecto. DT-2 se cierra cuando el servicio deje de depender de ese script.
+
 ### 🔴 DT-3 · Split estratificado y validación cruzada
 
 **Problema.** El split no usa `stratify=y`, y la selección del mejor modelo se hace
@@ -66,6 +76,14 @@ cruzada, no por un valor puntual.
 folds, y el modelo elegido supera al segundo por más de una desviación estándar —
 o se documenta explícitamente que la diferencia no es significativa.
 
+**Estado parcial (2026-09-17).** La estratificación ya está (`stratify=` en ambos
+experimentos de `train_cardio_real.py`) y hay IC 95 % bootstrap del AUC del ganador.
+Falta la validación cruzada: sigue siendo una única partición, así que el IC acota el
+ruido de muestreo del test, no el de partición. La segunda mitad del criterio sí está
+documentada: en B1 los cinco algoritmos quedan dentro del ruido (Random Forest 0,6941
+vs. regresión logística 0,6924, con IC de ancho ±0,009) y así se reporta en
+[DT1_RESULTS.md](DT1_RESULTS.md).
+
 ### 🔴 DT-4 · Separar selección de evaluación
 
 **Problema.** El mismo conjunto de test elige el modelo ganador y reporta su
@@ -76,6 +94,10 @@ seleccionar, y test (20 %) tocado **una sola vez**, al final.
 
 **Criterio de aceptación.** El conjunto de test se evalúa exactamente una vez, con
 el modelo ya elegido.
+
+**Sin avance (2026-09-17).** `train_cardio_real.py` hereda el defecto: su
+`criterio_seleccion` es `macro_f1 en test`. Es ahora el defecto estadístico más grave
+que queda abierto en el pipeline real.
 
 ---
 
@@ -186,6 +208,12 @@ segundos del resto de modelos. Medición: 0,60 s (n=2.000) → 2,23 s (n=4.000) 
 **Criterio de aceptación.** El entrenamiento completo no emite `FutureWarning` de
 scikit-learn.
 
+**Estado parcial (2026-09-17).** `train_cardio_real.py` ya usa
+`CalibratedClassifierCV(SVC(...), method="sigmoid", cv=5, ensemble=False)`. Queda
+`train_classical_models.py`. Coste medido en el dataset real: el SVM consume 462 s de
+los 3.071 s totales en A′-con-PA y 1.273 s en la corrida de robustez — entre el 40 y
+el 80 % del tiempo de cada experimento.
+
 ### 🟢 DT-12 · Contenerización
 
 `Dockerfile` para el servicio y `docker-compose.yml` que levante servicio +
@@ -223,7 +251,7 @@ con curvas de calibración y aplicar `CalibratedClassifierCV` si hace falta.
 ## Orden de ejecución sugerido
 
 ```
-DT-1 ──► DT-2 ──► DT-3 ──► DT-4        Fase 1: sin esto, nada más importa
+DT-1 ✅ ─► DT-2 ──► DT-3 ──► DT-4      Fase 1: sin esto, nada más importa
                               │
                               ▼
                     DT-5 ──► DT-6 ──► DT-7, DT-8      Fase 2

@@ -9,10 +9,36 @@ y el versionado sigue [SemVer](https://semver.org/lang/es/).
 
 ## [No publicado]
 
+### Añadido
+
+- **Entrenamiento sobre datos reales** — `src/train_cardio_real.py` entrena los
+  5 algoritmos sobre `data/real/cardio/cardio_train.csv` (68.678 filas tras
+  limpieza) en dos experimentos: A′ (riesgo cardiovascular, con ablación de
+  `ap_hi`/`ap_lo`) y B1 (hipertensión con la presión arterial excluida de las
+  features). Persiste `models/dt1_manifest.json` con métricas, curvas de
+  calibración, IC bootstrap, hashes de artefactos y versiones del entorno.
+- **`scripts/audit_cardio_leakage.py`** — criterio de aceptación de DT-1: busca
+  reglas deterministas (umbral univariado y árbol CART propio) sobre el dataset
+  real, con control positivo. Sin dependencias de ML: solo numpy y pandas.
+- **`docs/DT1_RESULTS.md`** — resultados completos y sus límites.
+- Objetivos `make train-real` y `make audit-real`.
+
+### Corregido
+
+- **DT-1 · Target leakage** — el pipeline de entrenamiento deja de depender del
+  dataset sintético cuyo target era función determinista de las features. La mejor
+  regla determinista sobre las nuevas features supera al baseline en +2,28 pp
+  (límite de aceptación: 5 pp).
+- En el pipeline real, el `StandardScaler` se ajusta solo sobre train (DT-2), el
+  split es estratificado (DT-3 parcial) y el SVM usa `CalibratedClassifierCV` en
+  lugar de `SVC(probability=True)`, deprecado (DT-17 parcial).
+
 ### Por hacer
 
-Ver [docs/ROADMAP.md](docs/ROADMAP.md). Prioridad inmediata: corregir el target
-leakage (DT-1) migrando el entrenamiento al dataset real de Kaggle.
+Ver [docs/ROADMAP.md](docs/ROADMAP.md). Prioridad inmediata: **DT-4** — separar
+selección de evaluación con un split en tres. Las métricas publicadas siguen
+sesgadas al alza mientras el test elija y evalúe al mismo tiempo. Después, DT-5:
+el servicio sigue sirviendo el modelo sintético.
 
 ---
 

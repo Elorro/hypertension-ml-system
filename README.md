@@ -31,6 +31,22 @@ python scripts/verify_leakage.py
 
 Detalle completo, evidencia y consecuencias en **[docs/LEAKAGE_ANALYSIS.md](docs/LEAKAGE_ANALYSIS.md)**.
 
+**Estado actual del defecto: corregido en el pipeline de entrenamiento, aún no en el
+servicio.** Desde el 2026-09-17 existe un segundo pipeline,
+[`src/train_cardio_real.py`](src/train_cardio_real.py), que entrena sobre el dataset
+real de Kaggle (68.678 pacientes) excluyendo la presión arterial de las features. Ahí
+la pregunta es genuina y la respuesta, modesta: **AUC 0,6941 [0,6849 · 0,7035]** para
+estimar el estado hipertensivo sin medirlo, con una accuracy apenas +3,25 pp sobre el
+baseline de clase mayoritaria. Verificable con:
+
+```bash
+python scripts/audit_cardio_leakage.py    # criterio de aceptación de DT-1
+```
+
+Resultados completos en **[docs/DT1_RESULTS.md](docs/DT1_RESULTS.md)**. El servicio
+FastAPI y el dashboard **siguen sirviendo el modelo sintético**: lo que se expone en
+`/predecir` continúa siendo el `if` tautológico hasta que se cierre DT-5.
+
 **Lo que sí demuestra este repositorio, y demuestra bien:**
 
 - Pipeline reproducible de datos → entrenamiento → selección de modelo → artefactos.
@@ -38,6 +54,9 @@ Detalle completo, evidencia y consecuencias en **[docs/LEAKAGE_ANALYSIS.md](docs
 - Servicio de inferencia con FastAPI, esquema validado con Pydantic y OpenAPI automático.
 - Dashboard Streamlit con inferencia individual y masiva vía CSV.
 - EDA sobre un dataset clínico real (70.000 pacientes, Kaggle).
+- Auditoría de leakage con **control positivo**, y una ablación con bootstrap pareado
+  que cuantifica cuánto vale medir la presión arterial: Δ AUC = 0,1103
+  [0,1027 · 0,1181].
 
 **Aviso médico:** herramienta con fines educativos. No constituye diagnóstico,
 consejo médico ni sustituye la valoración de un profesional de la salud.
@@ -193,14 +212,18 @@ hypertension-ml-system/
 ├── app/dashboard.py              # Dashboard Streamlit (consume el servicio)
 ├── src/
 │   ├── generate_dataset.py       # Generador de datos sintéticos
-│   └── train_classical_models.py # Entrenamiento y selección de modelo
-├── scripts/verify_leakage.py     # Auditoría reproducible del target leakage
+│   ├── train_classical_models.py # Entrenamiento sintético (alimenta al servicio)
+│   └── train_cardio_real.py      # DT-1: entrenamiento sobre datos reales
+├── scripts/
+│   ├── verify_leakage.py         # Auditoría del leakage del dataset sintético
+│   └── audit_cardio_leakage.py   # Criterio de aceptación de DT-1 (datos reales)
 ├── notebooks/
 │   └── EDA_cardiovascular_real.ipynb  # EDA sobre datos reales de Kaggle
 ├── data/
 │   ├── raw/                      # Dataset sintético generado (no versionado)
 │   └── real/cardio/              # Dataset Kaggle (70k pacientes)
-├── models/                       # Artefactos entrenados (no versionados)
+├── models/                       # Artefactos entrenados (.pkl no versionados)
+│   └── dt1_manifest.json         # Evidencia de la corrida DT-1 (sí versionado)
 ├── docs/                         # Documentación técnica
 └── [scripts de la raíz]          # Pipeline heredado — ver ROADMAP
 ```
@@ -216,6 +239,7 @@ hypertension-ml-system/
 | [MODEL_CARD.md](docs/MODEL_CARD.md) | Model card: uso previsto, límites, riesgos |
 | [DATA.md](docs/DATA.md) | Diccionario de datos, procedencia y licencias |
 | [API.md](docs/API.md) | Referencia de endpoints |
+| [DT1_RESULTS.md](docs/DT1_RESULTS.md) | Resultados sobre el dataset real y sus límites |
 | [ROADMAP.md](docs/ROADMAP.md) | Deuda técnica priorizada y trabajo futuro |
 | [BITACORA.md](BITACORA.md) | Registro cronológico de decisiones |
 
@@ -223,12 +247,20 @@ hypertension-ml-system/
 
 ## Estado del proyecto
 
-**Fase actual: prototipo funcional con validación estadística pendiente.**
+**Fase actual: prototipo funcional; compuerta de validación superada en el
+entrenamiento, no en el servicio.**
 
-El sistema corre end-to-end, pero no ha pasado la compuerta de validación: el
-dataset sintético no permite conclusiones predictivas. El siguiente hito es
-reentrenar sobre el dataset real de Kaggle excluyendo `PAS`/`PAD` del conjunto de
-features. Ver [docs/ROADMAP.md](docs/ROADMAP.md).
+- ✅ **DT-1 cerrado** (2026-09-17). El entrenamiento migró al dataset real; ninguna
+  regla determinista sobre las features supera al baseline por más de 2,28 pp.
+- ❌ **DT-4 abierto**, y es el defecto estadístico más grave que queda: el ganador se
+  elige por macro-F1 sobre el mismo test que reporta sus métricas, así que las cifras
+  publicadas están sesgadas al alza.
+- ❌ **DT-3 parcial**: split estratificado sí, validación cruzada no. Los cinco
+  algoritmos quedan dentro del ruido entre sí.
+- ❌ **DT-5 abierto**: `api/main.py` sigue cargando `models/modelo_*.pkl`, el modelo
+  entrenado sobre el dataset sintético.
+
+Ver [docs/ROADMAP.md](docs/ROADMAP.md) y [BITACORA.md](BITACORA.md).
 
 ## Licencia
 

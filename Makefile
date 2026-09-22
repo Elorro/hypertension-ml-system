@@ -1,4 +1,4 @@
-.PHONY: help install install-dev data train setup api dashboard audit test lint format clean
+.PHONY: help install install-dev data train train-real setup api dashboard audit audit-real test lint format clean
 
 PYTHON := python
 HOST   := 127.0.0.1
@@ -20,6 +20,9 @@ data:  ## Genera el dataset sintético (50k filas, seed=42)
 train:  ## Entrena los 5 modelos y selecciona el mejor por macro-F1
 	$(PYTHON) src/train_classical_models.py
 
+train-real:  ## DT-1: entrena sobre el dataset real de Kaggle (~51 min)
+	$(PYTHON) src/train_cardio_real.py
+
 setup: data train  ## Prepara todo lo necesario para levantar el servicio
 
 api:  ## Levanta el servicio de inferencia (requiere `make setup`)
@@ -28,8 +31,11 @@ api:  ## Levanta el servicio de inferencia (requiere `make setup`)
 dashboard:  ## Levanta el dashboard Streamlit (requiere `make api` corriendo)
 	streamlit run app/dashboard.py
 
-audit:  ## Ejecuta la auditoría de target leakage
+audit:  ## Auditoría de target leakage del dataset sintético
 	$(PYTHON) scripts/verify_leakage.py
+
+audit-real:  ## Criterio de aceptación de DT-1 sobre el dataset real
+	$(PYTHON) scripts/audit_cardio_leakage.py
 
 test:  ## Ejecuta la suite de tests
 	pytest -v --cov=src --cov=api --cov-report=term-missing
@@ -42,7 +48,7 @@ format:  ## Aplica formateo automático
 	ruff format .
 	ruff check --fix .
 
-clean:  ## Elimina artefactos generados y caches
+clean:  ## Elimina artefactos generados y caches (conserva models/dt1_manifest.json)
 	rm -rf models/*.pkl models/mejor_modelo.txt
 	rm -rf data/raw data/processed reports
 	rm -rf .pytest_cache .mypy_cache .ruff_cache htmlcov .coverage

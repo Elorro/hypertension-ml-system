@@ -8,6 +8,100 @@ Formato: entradas descendentes (lo más reciente arriba).
 
 ---
 
+## 2026-09-21 — DT-1 cerrado: el proyecto pasa a ser predictivo
+
+**Fase:** 2 (validación matemática) — **compuerta superada**
+
+### Qué se cerró
+
+El defecto que dominaba el repositorio desde enero está resuelto. El entrenamiento ya
+no corre sobre el dataset sintético cuyo target era una función determinista de las
+features, sino sobre `data/real/cardio/cardio_train.csv` (70.000 → 68.678 filas tras
+limpieza declarada a priori).
+
+La corrida de referencia es del **2026-09-17** (`src/train_cardio_real.py`, 3.071 s,
+`seed=42`); esta entrada registra su cierre formal: auditoría de aceptación,
+documentación y actualización del ROADMAP.
+
+### Resultados
+
+**A′ — ablación de la presión arterial (target `cardio`).** Con `ap_hi`/`ap_lo`:
+AUC 0,8017. Sin ellas: 0,6914. Bootstrap pareado sobre las mismas filas:
+Δ AUC = **0,1103, IC 95 % [0,1027 · 0,1181]**. Es el resultado cuantitativo más
+sólido del proyecto.
+
+**B1 — hipertensión sin medir la presión (target `hta`, 10 features).**
+AUC 0,6941 [0,6849 · 0,7035]. Hay señal real, pero la accuracy (68,92 %) supera al
+baseline de clase mayoritaria (65,67 %) en solo **+3,25 pp**: la información está en
+el ranking de riesgo, no en la decisión binaria con umbral 0,5.
+
+### Tres lecturas que conviene no suavizar
+
+1. **Los cinco algoritmos empatan.** Random Forest 0,6941 vs. regresión logística
+   0,6924, con IC de ancho ±0,009. Declarar un ganador sería sobreleer el resultado.
+   Lo defendible: el techo sin presión arterial es AUC ≈ 0,69 y una regresión
+   logística lo alcanza.
+2. **Los hiperparámetros heredados sobreajustan.** RF: AUC 0,803 en train → 0,694 en
+   test. XGBoost: 0,830 → 0,685. La regresión logística no se mueve (0,695 → 0,692).
+   Venían del pipeline sintético, donde la flexibilidad servía para memorizar un `if`.
+3. **DT-4 sigue abierto y es ahora el peor defecto vivo.** El ganador se elige por
+   macro-F1 sobre el mismo test que reporta sus métricas.
+
+### Criterio de aceptación
+
+`scripts/audit_cardio_leakage.py` (nuevo, solo numpy + pandas) busca reglas
+deterministas sin entrenar modelos: mejor umbral univariado y árbol CART propio de
+profundidad ≤ 3.
+
+```
+                                      baseline   mejor regla   ganancia
+B1 — hta SIN presión (real)            65,67 %      67,95 %     +2,28 pp   PASA
+CONTROL POSITIVO — con ap_hi/ap_lo     65,67 %      99,27 %    +33,60 pp   FALLA (correcto)
+```
+
+El control positivo es lo que hace válida la auditoría: la misma maquinaria que
+reporta +2,28 pp reconstruye el target al 99,27 % en cuanto se le devuelven las dos
+columnas de presión. La auditoría además reimplementa la limpieza de forma
+independiente y verifica que llega a las mismas 68.678 filas.
+
+### Hallazgo de entorno
+
+El entorno local se degradó desde la corrida del 17-sep: ya no tiene `scikit-learn`,
+`xgboost` ni `joblib`, `pandas` pasó de 2.3.3 a 3.0.3 y `.venv/bin/python3` perdió el
+bit de ejecución. Por eso la auditoría se escribió sin dependencias de ML: corre hoy
+tal cual. Reproducir las cifras exactas del manifiesto exige reinstalar las versiones
+que este registra — es el argumento empírico a favor de DT-11 (fijar versiones).
+
+### Decisiones tomadas
+
+- **El ganador de B1 no se presenta como «Random Forest gana».** Se reporta el empate
+  y el techo de AUC.
+- **La auditoría lleva control positivo obligatorio.** Un «pasa» sin él no prueba nada
+  sobre el poder del buscador de reglas.
+- **Los artefactos `dt1_*` no sustituyen todavía a los del servicio.** `api/main.py`
+  sigue sirviendo el modelo sintético; migrarlo es parte de DT-5, y hasta entonces lo
+  que el sistema expone en producción sigue siendo el `if` tautológico.
+- **El umbral `≥` de `hta` no se re-eligió.** La corrida con `>` es reporte de
+  robustez (AUC 0,6657) y no guardó artefactos.
+
+### Artefactos producidos
+
+`scripts/audit_cardio_leakage.py` · `docs/DT1_RESULTS.md` · `models/dt1_manifest.json`
+(53 KB de evidencia: métricas, curvas de calibración, hashes, tiempos) ·
+`models/dt1_*__modelo.pkl` + `__scaler.pkl` · `docs/ROADMAP.md`, `README.md`,
+`PORTFOLIO.md`, `CHANGELOG.md` y `CLAUDE.md` actualizados · `Makefile` con
+`train-real` y `audit-real`.
+
+### Siguiente paso
+
+**DT-4** — split en tres (60/20/20): seleccionar sobre validación, tocar el test una
+sola vez. Es barato de implementar sobre `train_cardio_real.py` y es lo único que
+falta para que las cifras publicadas dejen de estar sesgadas al alza. Después, DT-3
+(validación cruzada) y DT-5 (migrar el servicio a los artefactos `dt1_*`, que es lo
+que hace que el sistema deje de servir el modelo tautológico).
+
+---
+
 ## 2026-07-24 (tarde) — CI en rojo: pipeline roto con scikit-learn moderno
 
 **Fase:** 3 (prototipo)
