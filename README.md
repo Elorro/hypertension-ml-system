@@ -1,4 +1,4 @@
-# Sistema de Clasificación de Hipertensión Arterial
+# Riesgo cardiovascular y estimación de hipertensión sin medir la presión: ML sobre datos reales con auditoría de target leakage
 
 Sistema end-to-end de machine learning sobre el dataset real *Cardiovascular Disease*
 (Kaggle): entrenamiento comparativo de cinco algoritmos, servicio REST que expone

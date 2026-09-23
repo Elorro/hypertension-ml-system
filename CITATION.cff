@@ -1,5 +1,5 @@
 cff-version: 1.2.0
-title: "Sistema de Clasificación de Hipertensión Arterial"
+title: "Riesgo cardiovascular y estimación de hipertensión sin medir la presión: ML sobre datos reales con auditoría de target leakage"
 message: "Si utilizas este software, por favor cítalo como se indica."
 type: software
 authors:
@@ -8,17 +8,19 @@ authors:
     email: "luisalfredoaraque@gmail.com"
 repository-code: "https://github.com/Elorro/hypertension-ml-system"
 abstract: >-
-  Sistema end-to-end de machine learning para clasificación de niveles de
-  hipertensión arterial: generación de datos sintéticos, entrenamiento
-  comparativo de cinco algoritmos clásicos, servicio REST de inferencia con
-  FastAPI y dashboard interactivo con Streamlit. El proyecto documenta de forma
-  explícita un caso de target leakage en su dataset sintético y se distribuye
+  Sistema end-to-end de machine learning sobre el dataset real Cardiovascular
+  Disease (Kaggle): entrenamiento comparativo de cinco algoritmos clásicos y un
+  servicio REST con FastAPI que devuelve probabilidades de enfermedad
+  cardiovascular y, como experimento, de hipertensión estimada sin medir la
+  presión arterial, más un dashboard con Streamlit. Documenta y conserva como
+  evidencia reproducible un caso de target leakage en su dataset sintético
+  original, con una auditoría de aceptación con control positivo. Se distribuye
   como material educativo sobre ingeniería de sistemas de ML, no como
   herramienta clínica.
 keywords:
   - machine-learning
   - hipertension
-  - clasificacion-multiclase
+  - clasificacion-binaria
   - fastapi
   - streamlit
   - target-leakage
