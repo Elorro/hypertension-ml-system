@@ -39,12 +39,13 @@ CLASES = {
     3: "Hipertensión Grado 2",
 }
 
+
 # ======================================================
 # Definición de esquema de entrada (Pydantic)
 # ======================================================
 class Paciente(BaseModel):
     Edad: int
-    Sexo: int            # 0 = F, 1 = M
+    Sexo: int  # 0 = F, 1 = M
     Peso: float
     Talla: float
     IMC: float
@@ -54,10 +55,10 @@ class Paciente(BaseModel):
     Frec_Card: float
     Colesterol: float
     Glucosa: float
-    Tabaquismo: int      # 0 = No, 1 = Sí
-    Ejercicio: int       # horas/semana
-    Estres: int          # 1-10
-    Herencia_HTA: int    # 0 = No, 1 = Sí
+    Tabaquismo: int  # 0 = No, 1 = Sí
+    Ejercicio: int  # horas/semana
+    Estres: int  # 1-10
+    Herencia_HTA: int  # 0 = No, 1 = Sí
 
 
 # ======================================================
@@ -95,23 +96,27 @@ def predecir(paciente: Paciente):
     #  "Frec_Card", "Colesterol", "Glucosa", "Tabaquismo", "Ejercicio",
     #  "Estres", "Herencia_HTA"]
 
-    x = np.array([[
-        paciente.Edad,
-        paciente.Sexo,
-        paciente.Peso,
-        paciente.Talla,
-        paciente.IMC,
-        paciente.PAS,
-        paciente.PAD,
-        paciente.PAM,
-        paciente.Frec_Card,
-        paciente.Colesterol,
-        paciente.Glucosa,
-        paciente.Tabaquismo,
-        paciente.Ejercicio,
-        paciente.Estres,
-        paciente.Herencia_HTA,
-    ]])
+    x = np.array(
+        [
+            [
+                paciente.Edad,
+                paciente.Sexo,
+                paciente.Peso,
+                paciente.Talla,
+                paciente.IMC,
+                paciente.PAS,
+                paciente.PAD,
+                paciente.PAM,
+                paciente.Frec_Card,
+                paciente.Colesterol,
+                paciente.Glucosa,
+                paciente.Tabaquismo,
+                paciente.Ejercicio,
+                paciente.Estres,
+                paciente.Herencia_HTA,
+            ]
+        ]
+    )
 
     # Escalar
     x_scaled = scaler.transform(x)

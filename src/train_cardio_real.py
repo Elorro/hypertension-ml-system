@@ -153,7 +153,12 @@ def load_and_clean() -> tuple[pd.DataFrame, dict[str, Any]]:
 
     feature_cols = [c for c in raw.columns if c != "id"]
     df = raw.drop_duplicates(subset=feature_cols, keep="first")
-    step("duplicados_exactos", "duplicado exacto en todas las columnas salvo id; se conserva la primera aparición", raw, df)
+    step(
+        "duplicados_exactos",
+        "duplicado exacto en todas las columnas salvo id; se conserva la primera aparición",
+        raw,
+        df,
+    )
 
     before = df
     df = df[df["ap_lo"] < df["ap_hi"]]
@@ -220,9 +225,7 @@ def make_models() -> dict[str, ClassifierMixin]:
             ensemble=False,
         ),
         "DecisionTree": DecisionTreeClassifier(max_depth=8, random_state=SEED),
-        "RandomForest": RandomForestClassifier(
-            n_estimators=300, max_depth=12, random_state=SEED, n_jobs=-1
-        ),
+        "RandomForest": RandomForestClassifier(n_estimators=300, max_depth=12, random_state=SEED, n_jobs=-1),
         "XGBoost": XGBClassifier(
             n_estimators=400,
             learning_rate=0.05,

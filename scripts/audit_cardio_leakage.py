@@ -79,8 +79,8 @@ FEATURES_SIN_PA = [
 FEATURES_CON_PA = FEATURES_SIN_PA + ["ap_hi", "ap_lo"]
 
 MAX_DEPTH = 3
-N_QUANTILES = 10          # umbrales candidatos por feature
-TOLERANCIA_PP = 5.0       # criterio de aceptación de DT-1, en puntos porcentuales
+N_QUANTILES = 10  # umbrales candidatos por feature
+TOLERANCIA_PP = 5.0  # criterio de aceptación de DT-1, en puntos porcentuales
 
 
 # =======================================================
@@ -194,9 +194,9 @@ def regla_univariada(
 class Nodo:
     feature: int | None = None
     umbral: float = 0.0
-    valor: float = 0.0          # proporción de positivos en la hoja
-    izq: "Nodo | None" = None
-    der: "Nodo | None" = None
+    valor: float = 0.0  # proporción de positivos en la hoja
+    izq: Nodo | None = None
+    der: Nodo | None = None
     n: int = 0
 
     @property
@@ -267,9 +267,7 @@ def imprimir_arbol(nodo: Nodo, nombres: list[str], sangria: str = "    ") -> lis
 # =======================================================
 # Auditoría de una configuración
 # =======================================================
-def auditar(
-    df: pd.DataFrame, features: list[str], target: str, etiqueta: str
-) -> dict[str, Any]:
+def auditar(df: pd.DataFrame, features: list[str], target: str, etiqueta: str) -> dict[str, Any]:
     y = df[target].to_numpy()
     tr, te = split_estratificado(y)
     X = df[features].to_numpy(dtype=float)
@@ -336,9 +334,7 @@ def auditoria_univariada(df: pd.DataFrame, features: list[str], target: str) -> 
 # Principal
 # =======================================================
 def main() -> int:
-    ap = argparse.ArgumentParser(
-        description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
-    )
+    ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--csv", type=Path, default=DEFAULT_CSV)
     ap.add_argument("--manifiesto", type=Path, default=DEFAULT_MANIFEST)
     args = ap.parse_args()
@@ -367,7 +363,9 @@ def main() -> int:
     sin_pa = auditar(df, FEATURES_SIN_PA, "hta", "B1 — hta SIN presión en features (configuración real)")
     con_pa = auditar(df, FEATURES_CON_PA, "hta", "CONTROL POSITIVO — hta CON ap_hi/ap_lo en features")
 
-    print(f"\n{'=' * 78}\nLinaje de las features de B1 (AUC univariada y correlación con la presión)\n{'=' * 78}")
+    print(
+        f"\n{'=' * 78}\nLinaje de las features de B1 (AUC univariada y correlación con la presión)\n{'=' * 78}"
+    )
     lin = auditoria_univariada(df, FEATURES_SIN_PA, "hta")
     print(f"  {'feature':<12} {'AUC univ.':>10} {'corr ap_hi':>12} {'corr ap_lo':>12}")
     for f, v in sorted(lin.items(), key=lambda kv: -kv[1]["auc_univariada"]):
@@ -379,11 +377,15 @@ def main() -> int:
         f"  Criterio: ninguna regla determinista sobre las features supera al baseline "
         f"de clase mayoritaria por más de {TOLERANCIA_PP:.0f} pp."
     )
-    print(f"  Control positivo (con presión):  {con_pa['ganancia_pp_sobre_baseline']:+6.2f} pp  "
-          f"-> debe fallar: {'FALLA (correcto)' if con_pa['ganancia_pp_sobre_baseline'] > TOLERANCIA_PP else 'NO FALLA (la auditoría no detecta leakage; revisar)'}")
+    print(
+        f"  Control positivo (con presión):  {con_pa['ganancia_pp_sobre_baseline']:+6.2f} pp  "
+        f"-> debe fallar: {'FALLA (correcto)' if con_pa['ganancia_pp_sobre_baseline'] > TOLERANCIA_PP else 'NO FALLA (la auditoría no detecta leakage; revisar)'}"
+    )
     aprueba = sin_pa["ganancia_pp_sobre_baseline"] <= TOLERANCIA_PP
-    print(f"  Configuración real (sin presión): {sin_pa['ganancia_pp_sobre_baseline']:+6.2f} pp  "
-          f"-> {'PASA' if aprueba else 'NO PASA'}")
+    print(
+        f"  Configuración real (sin presión): {sin_pa['ganancia_pp_sobre_baseline']:+6.2f} pp  "
+        f"-> {'PASA' if aprueba else 'NO PASA'}"
+    )
 
     if args.manifiesto.exists():
         man = json.loads(args.manifiesto.read_text())

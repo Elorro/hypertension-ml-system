@@ -54,7 +54,9 @@ def regla_completa(df: pd.DataFrame) -> np.ndarray:
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    parser = argparse.ArgumentParser(
+        description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
+    )
     parser.add_argument("--csv", type=Path, default=DEFAULT_CSV, help="Ruta al dataset sintético.")
     args = parser.parse_args()
 

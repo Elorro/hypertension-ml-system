@@ -21,11 +21,7 @@ def evaluar_modelo(nombre, modelo, X_test, y_test, y_pred, y_proba):
 
     # ROC-AUC: solo si el modelo tiene predict_proba
     try:
-        roc = roc_auc_score(
-            y_test,
-            y_proba,
-            multi_class="ovr"
-        )
+        roc = roc_auc_score(y_test, y_proba, multi_class="ovr")
     except ValueError as exc:
         # Ocurre si y_proba no cubre todas las clases presentes en y_test.
         print(f"  [aviso] ROC-AUC no calculable para {nombre}: {exc}")
@@ -64,9 +60,7 @@ def main():
     # -------------------------
     # Train / Test
     # -------------------------
-    X_train, X_test, y_train, y_test = train_test_split(
-        X_scaled, y, test_size=0.2, random_state=42
-    )
+    X_train, X_test, y_train, y_test = train_test_split(X_scaled, y, test_size=0.2, random_state=42)
 
     resultados = {}
 
@@ -114,11 +108,7 @@ def main():
     # =======================================================
     # 4. RANDOM FOREST
     # =======================================================
-    rf = RandomForestClassifier(
-        n_estimators=300,
-        max_depth=12,
-        random_state=42
-    )
+    rf = RandomForestClassifier(n_estimators=300, max_depth=12, random_state=42)
     rf.fit(X_train, y_train)
 
     y_pred = rf.predict(X_test)
@@ -137,7 +127,7 @@ def main():
         max_depth=8,
         subsample=0.9,
         colsample_bytree=0.9,
-        eval_metric="mlogloss"
+        eval_metric="mlogloss",
     )
 
     xgb.fit(X_train, y_train)

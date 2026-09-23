@@ -91,9 +91,23 @@ Cliente del servicio HTTP. No carga modelos: todo pasa por `POST /predecir`.
 El orden canónico de features, compartido por entrenamiento e inferencia:
 
 ```python
-["Edad", "Sexo", "Peso", "Talla", "IMC", "PAS", "PAD", "PAM",
- "Frec_Card", "Colesterol", "Glucosa", "Tabaquismo", "Ejercicio",
- "Estres", "Herencia_HTA"]
+[
+    "Edad",
+    "Sexo",
+    "Peso",
+    "Talla",
+    "IMC",
+    "PAS",
+    "PAD",
+    "PAM",
+    "Frec_Card",
+    "Colesterol",
+    "Glucosa",
+    "Tabaquismo",
+    "Ejercicio",
+    "Estres",
+    "Herencia_HTA",
+]
 ```
 
 Variables derivadas, calculadas idénticamente en dashboard y generador:

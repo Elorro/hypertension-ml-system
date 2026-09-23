@@ -6,11 +6,7 @@ import streamlit as st
 
 API_URL = "http://127.0.0.1:8000/predecir"
 
-st.set_page_config(
-    page_title="Dashboard Hipertensión",
-    page_icon="🩺",
-    layout="wide"
-)
+st.set_page_config(page_title="Dashboard Hipertensión", page_icon="🩺", layout="wide")
 
 st.title("🩺 Sistema de Clasificación de Hipertensión Arterial")
 st.markdown("""
@@ -67,7 +63,7 @@ with tab_individual:
         herencia_str = st.selectbox("¿Antecedentes familiares de HTA?", ["No", "Sí"])
 
     # Cálculos derivados
-    imc = peso / (talla ** 2)
+    imc = peso / (talla**2)
     pam = (pas + 2 * pad) / 3
 
     st.markdown(f"**IMC calculado:** `{imc:.1f}` kg/m²")
@@ -94,7 +90,7 @@ with tab_individual:
             "Tabaquismo": tabaquismo,
             "Ejercicio": ejercicio,
             "Estres": estres,
-            "Herencia_HTA": herencia
+            "Herencia_HTA": herencia,
         }
 
         resultado = llamar_api(payload)
@@ -142,9 +138,19 @@ with tab_csv:
 
         # Asegurar columnas requeridas
         columnas_necesarias = [
-            "Edad", "Sexo", "Peso", "Talla", "PAS", "PAD",
-            "Frec_Card", "Colesterol", "Glucosa",
-            "Tabaquismo", "Ejercicio", "Estres", "Herencia_HTA"
+            "Edad",
+            "Sexo",
+            "Peso",
+            "Talla",
+            "PAS",
+            "PAD",
+            "Frec_Card",
+            "Colesterol",
+            "Glucosa",
+            "Tabaquismo",
+            "Ejercicio",
+            "Estres",
+            "Herencia_HTA",
         ]
 
         faltantes = [c for c in columnas_necesarias if c not in df.columns]

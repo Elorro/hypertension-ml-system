@@ -13,6 +13,7 @@ serían engañosas sin este contexto.
 
 En `src/generate_dataset.py` la etiqueta se construye así (resumido):
 
+<!-- fmt: off -->
 ```python
 if PAS < 120 and PAD < 80:      diagnostico = 0   # Normal
 elif 120 <= PAS < 130 or 80 <= PAD < 85:  diagnostico = 1   # Prehipertensión
@@ -24,11 +25,12 @@ riesgo_extra = (IMC > 32) + (Colesterol > 240) + (Glucosa > 140) + (Estres > 7) 
 if riesgo_extra >= 3 and diagnostico < 3:  diagnostico += 1
 if Ejercicio >= 6 and diagnostico > 0:     diagnostico -= 1
 ```
+<!-- fmt: on -->
 
 Y en `src/train_classical_models.py` el conjunto de features es:
 
 ```python
-X = df.drop("Diagnostico", axis=1)   # incluye PAS, PAD, IMC, Colesterol, Glucosa, Estres, Herencia, Ejercicio
+X = df.drop("Diagnostico", axis=1)  # incluye PAS, PAD, IMC, Colesterol, Glucosa, Estres, Herencia, Ejercicio
 ```
 
 Es decir: **todas las variables que determinan la etiqueta se entregan al modelo

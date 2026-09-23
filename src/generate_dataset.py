@@ -17,7 +17,7 @@ def generar_dataset(n=50000, seed=42):
     # -----------------------------
     edad = np.random.randint(18, 90, n)
 
-    sexo = np.random.choice([0, 1], size=n, p=[0.48, 0.52])  
+    sexo = np.random.choice([0, 1], size=n, p=[0.48, 0.52])
     # 0 = F, 1 = M
 
     # -----------------------------
@@ -26,13 +26,13 @@ def generar_dataset(n=50000, seed=42):
     peso = np.random.normal(75, 15, n).clip(40, 160)
     talla = np.random.normal(1.68, 0.12, n).clip(1.40, 2.00)
 
-    imc = peso / (talla ** 2)
+    imc = peso / (talla**2)
 
     # -----------------------------
     # Cardiovasculares
     # -----------------------------
-    pas = np.random.normal(130, 20, n).clip(85, 240)   # presión sistólica
-    pad = np.random.normal(82, 12, n).clip(55, 140)    # presión diastólica
+    pas = np.random.normal(130, 20, n).clip(85, 240)  # presión sistólica
+    pad = np.random.normal(82, 12, n).clip(55, 140)  # presión diastólica
 
     pam = (pas + 2 * pad) / 3
 
@@ -58,7 +58,6 @@ def generar_dataset(n=50000, seed=42):
     diagnostico = np.zeros(n, dtype=int)
 
     for i in range(n):
-
         PAS = pas[i]
         PAD = pad[i]
 
@@ -74,11 +73,7 @@ def generar_dataset(n=50000, seed=42):
 
         # Ruido fisiológico basado en otros factores
         riesgo_extra = (
-            (imc[i] > 32) +
-            (colesterol[i] > 240) +
-            (glucosa[i] > 140) +
-            (estres[i] > 7) +
-            (herencia[i] == 1)
+            (imc[i] > 32) + (colesterol[i] > 240) + (glucosa[i] > 140) + (estres[i] > 7) + (herencia[i] == 1)
         )
 
         # Si tiene mucho riesgo, puede subir de nivel
@@ -92,24 +87,26 @@ def generar_dataset(n=50000, seed=42):
     # -----------------------------
     # Construcción del DataFrame
     # -----------------------------
-    df = pd.DataFrame({
-        "Edad": edad,
-        "Sexo": sexo,
-        "Peso": peso.round(1),
-        "Talla": talla.round(2),
-        "IMC": imc.round(1),
-        "PAS": pas.round(0),
-        "PAD": pad.round(0),
-        "PAM": pam.round(1),
-        "Frec_Card": frec_card.round(0),
-        "Colesterol": colesterol.round(0),
-        "Glucosa": glucosa.round(0),
-        "Tabaquismo": tabaquismo,
-        "Ejercicio": ejercicio,
-        "Estres": estres,
-        "Herencia_HTA": herencia,
-        "Diagnostico": diagnostico
-    })
+    df = pd.DataFrame(
+        {
+            "Edad": edad,
+            "Sexo": sexo,
+            "Peso": peso.round(1),
+            "Talla": talla.round(2),
+            "IMC": imc.round(1),
+            "PAS": pas.round(0),
+            "PAD": pad.round(0),
+            "PAM": pam.round(1),
+            "Frec_Card": frec_card.round(0),
+            "Colesterol": colesterol.round(0),
+            "Glucosa": glucosa.round(0),
+            "Tabaquismo": tabaquismo,
+            "Ejercicio": ejercicio,
+            "Estres": estres,
+            "Herencia_HTA": herencia,
+            "Diagnostico": diagnostico,
+        }
+    )
 
     return df
 

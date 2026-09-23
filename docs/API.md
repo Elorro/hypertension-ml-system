@@ -138,10 +138,21 @@ Ejemplo de `422` al omitir `PAS`:
 import requests
 
 paciente = {
-    "Edad": 52, "Sexo": 1, "Peso": 88.0, "Talla": 1.74, "IMC": 29.1,
-    "PAS": 145.0, "PAD": 92.0, "PAM": 109.7, "Frec_Card": 78.0,
-    "Colesterol": 215.0, "Glucosa": 112.0, "Tabaquismo": 1,
-    "Ejercicio": 2, "Estres": 7, "Herencia_HTA": 1,
+    "Edad": 52,
+    "Sexo": 1,
+    "Peso": 88.0,
+    "Talla": 1.74,
+    "IMC": 29.1,
+    "PAS": 145.0,
+    "PAD": 92.0,
+    "PAM": 109.7,
+    "Frec_Card": 78.0,
+    "Colesterol": 215.0,
+    "Glucosa": 112.0,
+    "Tabaquismo": 1,
+    "Ejercicio": 2,
+    "Estres": 7,
+    "Herencia_HTA": 1,
 }
 
 resp = requests.post("http://127.0.0.1:8000/predecir", json=paciente, timeout=5)

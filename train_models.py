@@ -40,6 +40,7 @@ DATA_PATH = Path("data/hypertension_synthetic.csv")
 MODEL_DIR = Path("models")
 REPORTS_DIR = Path("reports")
 
+
 def ensure_dataset(path: Path = DATA_PATH, n_samples: int = 50000) -> pd.DataFrame:
     if path.exists():
         return pd.read_csv(path)
@@ -151,7 +152,9 @@ def evaluate_model(model, X_test: pd.DataFrame, y_test: np.ndarray) -> Dict:
     return metrics
 
 
-def train_ann(X_train: pd.DataFrame, y_train: np.ndarray, X_test: pd.DataFrame, y_test: np.ndarray) -> Tuple[tf.keras.Model, Dict]:
+def train_ann(
+    X_train: pd.DataFrame, y_train: np.ndarray, X_test: pd.DataFrame, y_test: np.ndarray
+) -> Tuple[tf.keras.Model, Dict]:
     scaler = StandardScaler()
     X_train_scaled = scaler.fit_transform(X_train)
     X_test_scaled = scaler.transform(X_test)
@@ -220,7 +223,9 @@ def main():
         model.fit(X_train, y_train)
         metrics = evaluate_model(model, X_test, y_test)
         metrics_report[name] = metrics
-        print(f"{name} -> accuracy={metrics['accuracy']:.3f} | f1_macro={metrics['f1_macro']:.3f} | roc_auc_ovr={metrics['roc_auc_ovr']:.3f}")
+        print(
+            f"{name} -> accuracy={metrics['accuracy']:.3f} | f1_macro={metrics['f1_macro']:.3f} | roc_auc_ovr={metrics['roc_auc_ovr']:.3f}"
+        )
 
         if metrics["f1_macro"] > best_f1:
             best_f1 = metrics["f1_macro"]
@@ -230,9 +235,7 @@ def main():
     # Entrenamos ANN (no entra al top de producción por simplicidad de despliegue, pero se reporta)
     print("Entrenando red neuronal (TensorFlow)...")
     ann_model, ann_metrics = train_ann(X_train, y_train, X_test, y_test)
-    metrics_report["ann_tensorflow"] = {
-        k: v for k, v in ann_metrics.items() if k != "scaler"
-    }
+    metrics_report["ann_tensorflow"] = {k: v for k, v in ann_metrics.items() if k != "scaler"}
 
     save_metrics_report(metrics_report)
 

@@ -45,7 +45,7 @@ def generate_synthetic_hypertension_data(n_samples: int = 50000, seed: int = 42)
 
     imc = rng.normal(loc=26, scale=4, size=n_samples)
     imc = np.clip(imc, 17, 42)
-    peso = imc * (talla ** 2)
+    peso = imc * (talla**2)
 
     colesterol = rng.normal(loc=190, scale=35, size=n_samples)
     colesterol = np.clip(colesterol, 120, 320)

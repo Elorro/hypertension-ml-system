@@ -10,7 +10,9 @@ from data_pipeline import FEATURE_COLUMNS, LABEL_MAP
 
 def load_model_bundle(model_path: Path = Path("models/best_model.joblib")) -> Dict:
     if not model_path.exists():
-        raise FileNotFoundError(f"No se encontró el modelo en {model_path}. Entrena primero con train_models.py")
+        raise FileNotFoundError(
+            f"No se encontró el modelo en {model_path}. Entrena primero con train_models.py"
+        )
     bundle = joblib.load(model_path)
     bundle.setdefault("features", FEATURE_COLUMNS)
     bundle.setdefault("label_map", LABEL_MAP)

@@ -50,8 +50,8 @@ desincronización entre `scaler.pkl` y el modelo en inferencia.
 
 ```python
 pipe = Pipeline([("scaler", StandardScaler()), ("model", XGBClassifier(...))])
-pipe.fit(X_train, y_train)          # el scaler se ajusta solo con train
-joblib.dump(pipe, "models/modelo_xgb.pkl")   # un solo artefacto autocontenido
+pipe.fit(X_train, y_train)  # el scaler se ajusta solo con train
+joblib.dump(pipe, "models/modelo_xgb.pkl")  # un solo artefacto autocontenido
 ```
 
 **Criterio de aceptación.** Ningún `fit` ni `fit_transform` se ejecuta sobre datos
@@ -194,6 +194,7 @@ pipeline se romperá solo cuando salga esa versión.
 
 ```python
 from sklearn.calibration import CalibratedClassifierCV
+
 svm = CalibratedClassifierCV(SVC(kernel="rbf", C=2), ensemble=False)
 ```
 
