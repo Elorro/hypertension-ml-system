@@ -173,9 +173,14 @@ persiste en `models/mejor_modelo.txt`, que el servicio lee al arrancar.
 | Random Forest (300 árboles) | 94,84 % | 0,9498 |
 | **XGBoost (400 árboles)** | **95,32 %** | **0,9547** |
 
-Ese 95,3 % **no se lee contra el 29,6 % del azar, sino contra el 91,1 % que alcanza
-una regla `if` de doce líneas sin entrenamiento** — la misma que generó las
-etiquetas. Y la tabla contiene dos señales del defecto:
+Ese 95,3 % **no se lee contra el 29,6 % del azar, sino contra el 91,1 % de las
+etiquetas del dataset sintético que recupera una regla `if` determinista, sin
+entrenar** (`scripts/verify_leakage.py::regla_completa`): la misma que generó esas
+etiquetas. Es el defecto que DT-1 cerró; sobre el dataset real, sin la presión en las
+features, la mejor regla determinista que encuentra `scripts/audit_cardio_leakage.py`
+supera al baseline de clase mayoritaria en solo +2,28 pp, mientras que con
+`ap_hi`/`ap_lo` (control positivo) reconstruye el target al 99,27 %. Y la tabla
+contiene dos señales del defecto:
 
 - **Un árbol de profundidad 8 llega a 94,83 %**, a medio punto de 400 árboles
   boosteados. Cuando el gradient boosting no se despega de un modelo trivial, no

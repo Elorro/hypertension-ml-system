@@ -25,8 +25,9 @@ Familias de reglas buscadas (todas ajustadas en train, evaluadas en test):
 1. Clase mayoritaria (baseline).
 2. Mejor umbral univariado, por feature y por dirección.
 3. Árbol CART de profundidad <= 3 (implementación propia, gini, umbrales
-   candidatos en deciles). Equivale al "``if`` de doce líneas" del análisis
-   sintético: si una regla legible a mano recupera el target, se ve aquí.
+   candidatos en deciles). Equivale a la regla ``if`` determinista del análisis
+   sintético (``scripts/verify_leakage.py::regla_completa``): si una regla
+   legible a mano recupera el target, se ve aquí.
 
 Sin scikit-learn: solo numpy y pandas, para que la auditoría corra aunque el
 entorno de entrenamiento no esté instalado.

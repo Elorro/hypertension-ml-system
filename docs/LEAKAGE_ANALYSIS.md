@@ -11,21 +11,27 @@ serían engañosas sin este contexto.
 
 ## 1. El defecto
 
-En `src/generate_dataset.py` la etiqueta se construye así (resumido):
+En `src/generate_dataset.py` la etiqueta se construye así (sin el bucle por fila;
+misma lógica, con los mismos umbrales y ramas que
+`scripts/verify_leakage.py::regla_completa`):
 
-<!-- fmt: off -->
 ```python
-if PAS < 120 and PAD < 80:      diagnostico = 0   # Normal
-elif 120 <= PAS < 130 or 80 <= PAD < 85:  diagnostico = 1   # Prehipertensión
-elif 130 <= PAS < 140 or 85 <= PAD < 90:  diagnostico = 2   # HTA Grado 1
-else:                            diagnostico = 3   # HTA Grado 2
+if PAS < 120 and PAD < 80:
+    diagnostico = 0  # Normal
+elif 120 <= PAS < 130 or 80 <= PAD < 85:
+    diagnostico = 1  # Prehipertensión
+elif 130 <= PAS < 140 or 85 <= PAD < 90:
+    diagnostico = 2  # HTA Grado 1
+else:
+    diagnostico = 3  # HTA Grado 2
 
 # ajustes deterministas posteriores
 riesgo_extra = (IMC > 32) + (Colesterol > 240) + (Glucosa > 140) + (Estres > 7) + (Herencia == 1)
-if riesgo_extra >= 3 and diagnostico < 3:  diagnostico += 1
-if Ejercicio >= 6 and diagnostico > 0:     diagnostico -= 1
+if riesgo_extra >= 3 and diagnostico < 3:
+    diagnostico += 1
+if Ejercicio >= 6 and diagnostico > 0:
+    diagnostico -= 1
 ```
-<!-- fmt: on -->
 
 Y en `src/train_classical_models.py` el conjunto de features es:
 
@@ -55,16 +61,22 @@ Regla PAS/PAD pura                        →  61.87% de coincidencia
 Regla completa (con ajustes de riesgo)    →  91.09% de coincidencia
 ```
 
-**Interpretación.** Una regla escrita a mano, de doce líneas y sin entrenamiento,
-recupera el 91 % de las etiquetas. El 9 % restante no es señal aprendible: es
-**ruido de redondeo**. El generador clasifica usando los valores en punto flotante
-(`pas[i]`, `imc[i]`) pero guarda en el CSV versiones redondeadas
-(`pas.round(0)`, `imc.round(1)`), lo que desplaza filas cercanas a las fronteras de
-decisión. Sobre los valores sin redondear, la reconstrucción sería exacta.
+**Interpretación.** Una regla `if` determinista, sin entrenar
+(`scripts/verify_leakage.py::regla_completa`), recupera el 91,1 % de las etiquetas
+del dataset sintético. El 8,9 % restante no es señal aprendible: es **ruido de
+redondeo**. El generador clasifica usando los valores en punto flotante (`pas[i]`,
+`imc[i]`) pero guarda en el CSV versiones redondeadas (`pas.round(0)`,
+`imc.round(1)`), lo que desplaza filas cercanas a las fronteras de decisión. Sobre
+los valores sin redondear, la reconstrucción sería exacta.
 
 Consecuencia directa: **≈91 % es el techo de información útil del dataset, y ese
 techo lo alcanza un `if`.** Cualquier modelo que reporte accuracy en ese rango no
 ha aprendido nada que no estuviera ya escrito en el generador.
+
+Es el defecto que DT-1 cerró. Sobre el dataset real, sin la presión en las features,
+la mejor regla determinista que encuentra `scripts/audit_cardio_leakage.py` supera al
+baseline de clase mayoritaria en solo +2,28 pp, mientras que con `ap_hi`/`ap_lo`
+(control positivo) reconstruye el target al 99,27 %.
 
 ## 3. Confirmación empírica
 

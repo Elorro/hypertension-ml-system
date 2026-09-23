@@ -78,10 +78,16 @@ Evidencia cuantitativa, reproducible con `python scripts/verify_leakage.py`:
 | Random Forest, 300 árboles (entrenado) | 94,8 % |
 | XGBoost, 400 árboles (entrenado) | 95,3 % |
 
-Cualquier modelo entrenado compite contra el 91,1 % de la regla escrita a mano, no
-contra el 29,6 % del azar. Leída así, la tabla dice que 400 árboles boosteados
-mejoran unos pocos puntos sobre doce líneas de `if` — y que **un solo árbol de
-profundidad 8 ya alcanza 94,8 %**, a 0,5 puntos del ganador.
+Una regla `if` determinista, sin entrenar (`scripts/verify_leakage.py::regla_completa`),
+recupera el 91,1 % de las etiquetas del dataset sintético. Cualquier modelo entrenado
+compite contra esa cifra, no contra el 29,6 % del azar. Leída así, la tabla dice que
+400 árboles boosteados mejoran unos pocos puntos sobre esa regla — y que **un solo
+árbol de profundidad 8 ya alcanza 94,8 %**, a 0,5 puntos del ganador.
+
+Contraste con el dataset real (DT-1, sin la presión en las features): la mejor regla
+determinista que encuentra `scripts/audit_cardio_leakage.py` supera al baseline de
+clase mayoritaria en solo +2,28 pp, mientras que con `ap_hi`/`ap_lo` (control
+positivo) reconstruye el target al 99,27 %.
 
 El patrón más diagnóstico está en la brecha entre familias: los modelos basados en
 árboles llegan a ~95 % y los lineales o de kernel se quedan en 48–69 %. El target es

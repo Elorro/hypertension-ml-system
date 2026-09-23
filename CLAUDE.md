@@ -44,8 +44,9 @@ Regla PAS/PAD pura            → 61,87 %
 Regla completa del generador  → 91,09 %
 ```
 
-Un `if` de doce líneas recupera el 91 % de las etiquetas. El 9 % restante es ruido
-de redondeo del CSV, no señal. **Cualquier métrica de accuracy en este proyecto es
+Una regla `if` determinista, sin entrenar (`scripts/verify_leakage.py::regla_completa`),
+recupera el 91,1 % de las etiquetas del dataset sintético. El 8,9 % restante es ruido
+de redondeo del CSV, no señal. **Cualquier métrica de accuracy sobre el sintético es
 tautológica.** Análisis completo en `docs/LEAKAGE_ANALYSIS.md`.
 
 Implicación operativa: no reportar accuracy/F1 sin acompañarlo del baseline de la

@@ -34,13 +34,14 @@ mismos 5 algoritmos en cada una, partición estratificada, scaler ajustado solo 
 **Rigor — lo que distingue al proyecto.**
 - *Auditoría de target leakage* (`docs/LEAKAGE_ANALYSIS.md`, reproducible con
   `scripts/verify_leakage.py`): la etiqueta es una función determinista de PAS/PAD, que
-  también son features. Una regla `if` de doce líneas, sin entrenar, recupera el 91,1 % de
-  las etiquetas; XGBoost llega a 95,3 % y un solo árbol de profundidad 8 a 94,8 %. La brecha
-  árboles (~95 %) vs. modelos lineales (48–69 %) delata que el target es una partición por
-  umbrales. Conclusión: las métricas son tautológicas y el baseline correcto es la regla
-  clínica, no la clase mayoritaria (29,6 %). Documenta además defectos secundarios
-  (escalado antes del split, split sin estratificar, selección y evaluación sobre el mismo
-  test) y un plan de corrección priorizado.
+  también son features. Una regla `if` determinista, sin entrenar
+  (`scripts/verify_leakage.py::regla_completa`), recupera el 91,1 % de las etiquetas
+  del dataset sintético; XGBoost llega a 95,3 % y un solo árbol de profundidad 8 a
+  94,8 %. La brecha árboles (~95 %) vs. modelos lineales (48–69 %) delata que el target
+  es una partición por umbrales. Conclusión: las métricas son tautológicas y el baseline
+  correcto es la regla clínica, no la clase mayoritaria (29,6 %). Documenta además
+  defectos secundarios (escalado antes del split, split sin estratificar, selección y
+  evaluación sobre el mismo test) y un plan de corrección priorizado.
 - *Criterio de aceptación con control positivo* (`scripts/audit_cardio_leakage.py`): busca
   reglas deterministas —umbral univariado y árbol CART propio, sin sklearn— sobre el dataset
   real. En la configuración real supera al baseline en +2,28 pp (límite: 5 pp); devolviéndole
