@@ -2,26 +2,54 @@
 
 ## Visión general
 
-El sistema es un pipeline lineal de cuatro etapas con dos consumidores finales.
-No hay orquestador ni base de datos: la comunicación entre etapas ocurre a través
-del sistema de archivos (CSV y artefactos `.pkl`), y entre los servicios finales
-vía HTTP.
+El sistema es un pipeline lineal con dos consumidores finales. No hay orquestador ni
+base de datos: la comunicación entre etapas ocurre a través del sistema de archivos
+(CSV, artefactos `.pkl` y su manifiesto), y entre los servicios finales vía HTTP.
 
 ```
-generate_dataset.py ──► data/raw/*.csv ──► train_classical_models.py ──► models/*.pkl
-                                                                              │
-                                                        ┌─────────────────────┘
-                                                        ▼
-                                            api/main.py (FastAPI :8000)
-                                                        ▲
-                                                        │ HTTP POST /predecir
-                                                        │
-                                            app/dashboard.py (Streamlit :8501)
+data/real/cardio/cardio_train.csv ──► train_cardio_real.py ──► models/dt1_*.pkl
+                                              ▲                 models/dt1_manifest.json
+                     src/cardio_features.py ──┤                          │
+                                              ▼                          ▼
+                                    api/ (FastAPI :8000) ◄── verifica con src/artefactos.py
+                                              ▲
+                                              │ HTTP: /health, /v1/modelos, /v1/…
+                                              │
+                                    app/dashboard.py (Streamlit :8501)
+
+Evidencia del leakage (fuera del servicio):
+generate_dataset.py ──► data/raw/*.csv ──► train_classical_models.py ──► models/modelo_*.pkl
 ```
 
 ## Componentes
 
-### `src/generate_dataset.py` — generación de datos
+### `src/cardio_features.py` — fuente única de features y dominio
+
+Orden de features por experimento, derivación de `age_years` (`age / 365.25`) y `bmi`
+(`weight / (height/100)²`), cotas de limpieza (talla, peso, IMC), rangos de presión
+plausible y rango de edad de servicio. Solo biblioteca estándar: las funciones sirven
+igual para `pandas.Series` (entrenamiento) y para `float` (API). Lo importan
+`src/train_cardio_real.py` y `api/`; `scripts/audit_cardio_leakage.py` reimplementa la
+limpieza a propósito para ser una verificación independiente.
+
+### `src/train_cardio_real.py` — entrenamiento de DT-1
+
+Entrena los 5 algoritmos sobre el dataset real en dos experimentos (A′ con y sin
+presión arterial; B1 sin presión), con split estratificado 80/20 y `StandardScaler`
+ajustado solo sobre train. Persiste `models/dt1_<experimento>__{modelo,scaler}.pkl` y
+`models/dt1_manifest.json` (métricas, IC, calibración, sha256, versiones). Se ejecuta
+como módulo: `python -m src.train_cardio_real`. Resultados en
+[DT1_RESULTS.md](DT1_RESULTS.md).
+
+### `src/artefactos.py` — verificación de artefactos
+
+Compara versiones instaladas contra el manifiesto con dos perfiles (`entorno` para
+desarrollo y reentreno; `servicio` para la API: Python por major.minor, scikit-learn,
+numpy y joblib exactos), comprueba el sha256 de cada `.pkl`, lo carga tratando los
+avisos de versión como error y verifica la identidad del scaler (`mean_`/`scale_`).
+Lo usan `scripts/verify_env.py` y la API al arrancar.
+
+### `src/generate_dataset.py` — generación de datos sintéticos (evidencia)
 
 Produce `data/raw/dataset_hipertension_sintetico.csv` con 50.000 filas y 16 columnas
 (15 features + target). Las variables se muestrean de distribuciones normales o
@@ -34,10 +62,11 @@ factores de riesgo. **Esta derivación es el origen del target leakage documenta
 - Semilla fija (`seed=42`) → generación reproducible.
 - Salida: CSV sin índice, separador coma.
 
-### `src/train_classical_models.py` — entrenamiento y selección
+### `src/train_classical_models.py` — entrenamiento sintético (evidencia)
 
 Entrena cinco clasificadores sobre el CSV sintético y persiste cada uno más el
-`StandardScaler` ajustado.
+`StandardScaler` ajustado. Ningún servicio carga ya estos artefactos: se conservan
+como evidencia reproducible del leakage.
 
 Flujo:
 
@@ -55,40 +84,55 @@ Artefactos producidos en `models/`:
 
 | Archivo | Contenido |
 |---------|-----------|
-| `scaler.pkl` | `StandardScaler` ajustado — **obligatorio** en inferencia |
+| `scaler.pkl` | `StandardScaler` ajustado |
 | `modelo_logreg.pkl` · `modelo_svm.pkl` · `modelo_tree.pkl` · `modelo_rf.pkl` · `modelo_xgb.pkl` | Clasificadores entrenados |
 | `mejor_modelo.txt` | Nombre lógico del ganador (p. ej. `XGBoost`) |
 
-### `api/main.py` — servicio de inferencia (FastAPI)
+### `api/` — servicio de inferencia (FastAPI)
 
-Expone el modelo ganador como servicio HTTP.
+Expone A′ (`/v1/riesgo-cardiovascular`) y B1 (`/v1/hipertension-sin-pa`), cada uno con
+su `/lote`, más `/health` y `/v1/modelos`. Contrato completo en [API.md](API.md).
 
-- **Carga en tiempo de import:** lee `scaler.pkl`, `mejor_modelo.txt` y el `.pkl`
-  correspondiente al arrancar el módulo. Si falta cualquiera, el proceso falla al
-  iniciar. Es deliberado (fallo temprano y ruidoso) pero implica que
-  `src/train_classical_models.py` debe haberse ejecutado antes.
-- **Mapeo nombre → archivo:** el diccionario `nombre_a_archivo` traduce el contenido
-  de `mejor_modelo.txt` a la ruta del artefacto. Añadir un modelo nuevo al
-  entrenamiento exige actualizar también este diccionario.
-- **Validación de entrada:** el modelo Pydantic `Paciente` valida tipos, no rangos.
-  Un `PAS` de 900 se acepta y produce una predicción sin sentido.
-- **Contrato de features:** el orden del array construido en `/predecir` debe
-  coincidir **exactamente** con el orden de columnas del CSV de entrenamiento. Es un
-  acoplamiento implícito y frágil, sostenido solo por un comentario en el código.
+- **Carga en lifespan, una vez:** `api/servicio.py` verifica versiones (perfil
+  `servicio`) y sha256 con `src/artefactos.py` y carga modelo y scaler de cada
+  experimento. Si algo no coincide, la API no arranca. Rutas por `MODEL_DIR` y
+  `MANIFEST_PATH`.
+- **Validación de entrada:** `api/schemas.py`, con `extra="forbid"` (B1 rechaza
+  `ap_hi`/`ap_lo`) y las cotas de `src/cardio_features.py`. El IMC se calcula en el
+  servidor.
+- **Contrato de features:** la matriz se construye en el orden de `features_orden`
+  del manifiesto. Un test compara bit a bit la matriz de la API con la del
+  entrenamiento sobre todas las filas del CSV con presión plausible.
 
 ### `app/dashboard.py` — interfaz (Streamlit)
 
-Cliente del servicio HTTP. No carga modelos: todo pasa por `POST /predecir`.
-
-- **Pestaña individual:** formulario de 13 campos; calcula `IMC` y `PAM` derivados y
-  envía el payload completo de 15 features.
-- **Pestaña masiva:** carga un CSV, valida columnas obligatorias, deriva `IMC`/`PAM`
-  si faltan, y **emite una petición HTTP por fila**. Para archivos grandes esto es
-  lento; un endpoint batch está en el [ROADMAP](ROADMAP.md).
+Cliente HTTP puro: no importa scikit-learn ni carga modelos. Lee `API_URL`, espera a
+la API con reintentos sobre `/health`, construye formularios y etiquetas solo desde
+`/v1/modelos` y usa los endpoints `/lote` para el CSV (una llamada por bloque de hasta
+1.000 filas, errores por fila).
 
 ## Convenciones de datos
 
-El orden canónico de features, compartido por entrenamiento e inferencia:
+Orden de features de los modelos servidos (`src/cardio_features.py`, registrado en
+`features_orden` del manifiesto):
+
+```python
+FEATURES_B1 = [
+    "age_years",
+    "gender",
+    "height",
+    "weight",
+    "bmi",
+    "cholesterol",
+    "gluc",
+    "smoke",
+    "alco",
+    "active",
+]
+FEATURES_A_CON_PA = FEATURES_B1 + ["ap_hi", "ap_lo"]
+```
+
+Orden del dataset sintético (evidencia del leakage):
 
 ```python
 [
@@ -110,7 +154,7 @@ El orden canónico de features, compartido por entrenamiento e inferencia:
 ]
 ```
 
-Variables derivadas, calculadas idénticamente en dashboard y generador:
+Variables derivadas del dataset sintético, calculadas en el generador:
 
 $$\text{IMC} = \frac{\text{Peso}}{\text{Talla}^2} \qquad
   \text{PAM} = \frac{\text{PAS} + 2\cdot\text{PAD}}{3}$$
@@ -121,9 +165,9 @@ $$\text{IMC} = \frac{\text{Peso}}{\text{Talla}^2} \qquad
 `chatbot_cli.py` conforman una **implementación anterior e incompatible** que
 permanece en el repositorio pero no está integrada.
 
-Incompatibilidades con el pipeline activo:
+Incompatibilidades con el pipeline sintético de `src/`:
 
-| Aspecto | Pipeline activo (`src/`) | Pipeline heredado (raíz) |
+| Aspecto | Pipeline sintético (`src/`) | Pipeline heredado (raíz) |
 |---------|--------------------------|--------------------------|
 | Columna de target | `Diagnostico` | `HTA_Nivel` |
 | Nombre de la variable de estrés | `Estres` | `Estrés` (con tilde) |
@@ -143,13 +187,14 @@ La resolución (unificar o eliminar) está priorizada en [ROADMAP.md](ROADMAP.md
 **Por qué el dashboard consume HTTP en vez de importar el modelo.** Separar
 inferencia de presentación permite escalar, versionar y monitorear el modelo de
 forma independiente, y hace que el mismo servicio sirva a otros clientes. El costo
-es la latencia por petición, notoria en el modo masivo.
+es la latencia por petición, que el endpoint `/lote` acota en el modo masivo.
 
 **Por qué los artefactos no se versionan.** Los `.pkl` son binarios grandes que
 git no puede diferenciar; versionarlos infla el historial de forma irreversible.
-El repositorio versiona el *código que los produce*, y la reproducibilidad se
-garantiza con la semilla fija. El costo es que un clon limpio requiere `make setup`
-antes de arrancar el servicio.
+El repositorio versiona el *código que los produce* y `models/dt1_manifest.json`, con
+el sha256 de cada artefacto; la reproducibilidad se apoya en la semilla fija y en el
+entorno fijado por `requirements.lock.txt`. El costo es que un clon limpio requiere
+`make train-real` (~51 min) antes de arrancar el servicio.
 
 **Por qué se persiste el scaler junto a los modelos.** El escalado forma parte de la
 función de inferencia, no del entrenamiento. Reajustarlo en producción produciría

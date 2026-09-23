@@ -191,6 +191,28 @@ reproducible tal cual — a septiembre de 2026 el entorno local tiene pandas 3.0
 carece de scikit-learn. Reproducir las cifras exactas exige fijar las versiones del
 manifiesto (ver DT-11).
 
+## Actualización (2026-09-23)
+
+Este documento registra la corrida del 2026-09-17 y no se reescribe. Lo que cambió
+después, y deja obsoletas algunas afirmaciones de §6 y §7:
+
+- **El servicio ya sirve estos modelos** (`6e59035`). La API expone A′ (`riesgo_cv_con_pa`)
+  y B1 (`hta_b1`) con los artefactos `dt1_*` de esta corrida, verificados por sha256
+  contra el manifiesto al arrancar; `POST /predecir` y el modelo sintético salieron del
+  camino de servicio. El dashboard pasó a ser cliente de la API nueva (`a9b89ee`). La
+  viñeta de §6 «El servicio sigue sirviendo el modelo sintético» ya no aplica, y
+  tampoco la de DT-2: `src/train_classical_models.py` ya no alimenta a la API.
+- **El entorno de referencia es reproducible** (`f508c85`). `requirements.lock.txt`
+  fija las versiones del manifiesto y `make verify-env` comprueba versiones, sha256 de
+  los `.pkl`, carga y predicción. La advertencia de §7 sobre pandas 3.0.3 y la falta de
+  scikit-learn describía el entorno local de ese momento.
+- **El entrenamiento se ejecuta como módulo:** `python -m src.train_cardio_real`
+  (`86a5c29`). Las features, la derivación y las cotas pasaron a
+  `src/cardio_features.py`; las matrices de features son idénticas bit a bit a las de
+  esta corrida (hashes congelados en `tests/test_equivalencia_features.py`). No se
+  reentrenó: todas las cifras de arriba siguen siendo las de la corrida del 17-sep.
+- Siguen abiertos DT-3 y DT-4, con el sesgo al alza que describe §6.
+
 ---
 
 *Aviso médico: este sistema es una demostración de ingeniería de ML. No es un

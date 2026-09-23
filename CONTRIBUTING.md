@@ -7,10 +7,12 @@ entorno, qué estándares sigue el código y cómo proponer cambios.
 
 ## Antes de empezar
 
-Lee **[docs/LEAKAGE_ANALYSIS.md](docs/LEAKAGE_ANALYSIS.md)**. El proyecto tiene un
-defecto metodológico conocido y documentado en su núcleo, y buena parte del trabajo
-pendiente gira en torno a corregirlo. Contribuir sin ese contexto lleva a optimizar
-métricas que no significan nada.
+Lee **[docs/LEAKAGE_ANALYSIS.md](docs/LEAKAGE_ANALYSIS.md)** y
+**[docs/DT1_RESULTS.md](docs/DT1_RESULTS.md)**. El proyecto nació con un defecto
+metodológico en su núcleo (target leakage), que DT-1 corrigió migrando a datos reales;
+el pipeline sintético se conserva como evidencia. Las métricas actuales siguen
+sesgadas al alza mientras DT-4 esté abierto. Contribuir sin ese contexto lleva a
+optimizar métricas que no significan nada.
 
 Las tareas abiertas están priorizadas en **[docs/ROADMAP.md](docs/ROADMAP.md)** con
 identificadores `DT-N`. Referéncialos en tus commits y PRs.
@@ -24,14 +26,14 @@ cd hypertension-ml-system
 python -m venv .venv
 source .venv/bin/activate
 
-make install-dev     # ejecución + desarrollo
-make setup           # genera dataset y entrena modelos
+make install         # entorno exacto desde requirements.lock.txt
+make verify-env      # compuerta: versiones + sha256 + carga de los .pkl de DT-1
 make audit           # verifica que la auditoría de leakage corre
 ```
 
 ## Estándares de código
 
-**Python 3.12+, estilo idiomático.**
+**Python 3.14, estilo idiomático.**
 
 - **Type hints obligatorios** en toda función pública. El código existente en la
   raíz no los tiene de forma consistente; el código nuevo sí debe tenerlos.
@@ -50,22 +52,17 @@ make test
 
 ## Convenciones del dominio
 
-**Nombres de columnas.** El pipeline activo (`src/`, `api/`, `app/`) usa `Estres`
-**sin tilde** y `Diagnostico` como target. El pipeline heredado de la raíz usa
-`Estrés` y `HTA_Nivel`. No los mezcles: son esquemas incompatibles y unificarlos es
-la tarea DT-5.
+**Nombres de columnas.** Los modelos servidos usan los nombres del dataset real
+(`age_years`, `gender`, `height`…). El pipeline sintético de `src/` usa `Estres`
+**sin tilde** y `Diagnostico` como target; el heredado de la raíz usa `Estrés` y
+`HTA_Nivel`. No los mezcles: son esquemas incompatibles y unificarlos es la tarea DT-5.
 
-**Orden de features.** Cualquier cambio en el orden o el conjunto de features debe
-aplicarse simultáneamente en:
-
-1. `src/generate_dataset.py` — orden de columnas del DataFrame.
-2. `src/train_classical_models.py` — `X = df.drop("Diagnostico", axis=1)`.
-3. `api/main.py` — construcción del array en `/predecir`.
-4. `app/dashboard.py` — payload enviado al servicio.
-5. `docs/DATA.md` y `docs/API.md`.
-
-Este acoplamiento es frágil y hoy solo lo sostiene una convención. Un test de
-contrato que lo verifique es parte de DT-6 y sería una contribución muy bienvenida.
+**Orden de features.** El de los modelos servidos vive en un solo sitio,
+`src/cardio_features.py`, que importan el entrenamiento y la API; el dashboard lo
+toma de `/v1/modelos`. Cambiarlo invalida los `.pkl` de DT-1 y exige reentrenar. Los
+tests lo vigilan: `tests/test_equivalencia_features.py` (matrices idénticas a la
+corrida de referencia) y `tests/api/test_equivalencia.py` (la API construye la misma
+matriz, bit a bit).
 
 **Reproducibilidad.** Toda operación aleatoria lleva semilla explícita
 (`random_state=42` / `seed=42`). Un cambio que rompa la reproducibilidad debe
@@ -77,9 +74,11 @@ Al añadir un algoritmo nuevo:
 
 1. Entrénalo en `src/train_classical_models.py` con la misma interfaz que los demás.
 2. Regístralo en el diccionario `resultados` para que compita por macro-F1.
-3. **Añádelo al diccionario `nombre_a_archivo` en `api/main.py`.** Si lo olvidas, el
-   servicio falla con `KeyError` cuando ese modelo gane la selección.
-4. Documéntalo en la tabla de modelos del README.
+3. Documéntalo en la tabla de modelos del README.
+
+En el pipeline de DT-1 (`src/train_cardio_real.py`), el ganador se registra en el
+manifiesto y la API lo carga desde ahí; si fuera XGBoost, el perfil `servicio` de
+`src/artefactos.py` exigiría además `xgboost` exacto en `requirements-serve.txt`.
 
 Al reportar métricas, incluye siempre la comparación contra el baseline pertinente
 (regla clínica en el dataset sintético, clase mayoritaria en datos reales). Una
@@ -119,7 +118,7 @@ Si el cambio afecta métricas o metodología, incluye los números antes y despu
 - Cambios que presenten el modelo como clínicamente válido, o que retiren los avisos
   médicos de la interfaz, el servicio o la documentación.
 - Métricas reportadas sin su baseline.
-- Artefactos binarios (`.pkl`, `.h5`, CSV generados) en el control de versiones.
+- Artefactos binarios (`.pkl`, `.h5`, CSV generados) ni el dataset de Kaggle en el control de versiones.
 - Credenciales, tokens o rutas absolutas de una máquina concreta.
 
 ## Reportar problemas

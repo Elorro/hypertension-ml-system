@@ -22,6 +22,46 @@ y el versionado sigue [SemVer](https://semver.org/lang/es/).
   real, con control positivo. Sin dependencias de ML: solo numpy y pandas.
 - **`docs/DT1_RESULTS.md`** — resultados completos y sus límites.
 - Objetivos `make train-real` y `make audit-real`.
+- **Entorno reproducible** (`f508c85`) — `requirements.lock.txt` con el grafo completo
+  y numpy/pandas/scikit-learn/xgboost fijados a las versiones del manifiesto de DT-1;
+  `scripts/verify_env.py` y `make verify-env` como compuerta (versiones, sha256 de los
+  `.pkl`, carga y predicción).
+- **`src/cardio_features.py`** — fuente única de features, derivación y cotas de DT-1,
+  compartida por entrenamiento y API. **`src/artefactos.py`** — verificación de
+  versiones (perfiles `entorno` y `servicio`) y sha256 de los artefactos (`86a5c29`).
+- **API sobre los modelos reales** (`6e59035`): `POST /v1/riesgo-cardiovascular` (A′,
+  probabilidad + clase con umbral 0,5 explícito), `POST /v1/hipertension-sin-pa` (B1,
+  experimental, solo probabilidad), sus variantes `/lote` (hasta 1.000 filas, errores por
+  índice), `GET /health` y `GET /v1/modelos`. Entrada en unidades humanas validada
+  contra el dominio de entrenamiento; B1 rechaza la presión arterial con 422. Carga en
+  lifespan con verificación de versiones y sha256: si no coinciden, no arranca.
+- `title` y `x-etiquetas` por campo en el esquema de entrada (`73c84ea`).
+- **Dashboard** como cliente HTTP puro de la API nueva (`a9b89ee`): espera a la API con
+  reintentos, formularios y límites desde `/v1/modelos`, lote por CSV con errores por fila.
+- **Suite de tests** (`86a5c29`, `6e59035`, `a9b89ee`): contrato de API y dashboard en
+  CI con un doble del modelo; integración con los `.pkl` y el CSV reales, que se salta
+  con motivo visible si faltan.
+- `requirements-serve.txt` y `requirements-dashboard.txt` (instalaciones mínimas);
+  objetivos `make serve-api` y `make serve-dashboard`.
+
+### Cambiado
+
+- La versión del proyecto pasa a 2.0.0 (`pyproject.toml`, publicada en `/health`), sin
+  release.
+- `python -m src.train_cardio_real` y `python -m scripts.verify_env` sustituyen a la
+  ejecución directa de esos archivos.
+- Python 3.14 como versión de referencia (`f508c85`).
+- Todo el repositorio formateado con `ruff format` sin cambio de comportamiento
+  (`0e75317`); el job de lint de CI pasa a ser bloqueante (`d6d1b0f`).
+- El dataset de Kaggle deja de redistribuirse: estuvo versionado, se detectó que su
+  licencia es desconocida y se purgó de toda la historia con `git filter-repo`; se
+  descarga de la fuente. `.gitignore` ignora `data/real/` completo (`4b3b5d4`).
+
+### Eliminado
+
+- **Cambio incompatible:** `POST /predecir` y su contrato sintético de 4 clases y
+  15 features (`6e59035`). `api/` ya no carga `models/modelo_*.pkl`; el pipeline
+  sintético se conserva solo como evidencia del leakage.
 
 ### Corregido
 
@@ -32,13 +72,18 @@ y el versionado sigue [SemVer](https://semver.org/lang/es/).
 - En el pipeline real, el `StandardScaler` se ajusta solo sobre train (DT-2), el
   split es estratificado (DT-3 parcial) y el SVM usa `CalibratedClassifierCV` en
   lugar de `SVC(probability=True)`, deprecado (DT-17 parcial).
+- **DT-7 · Validación de rangos** y **DT-9 · Endpoint batch**, en la API nueva
+  (`6e59035`). **DT-11 · Versiones fijadas** (`f508c85`).
+- Documentación: la regla `if` deja de describirse con un conteo de líneas que no
+  cuadraba con ningún bloque real, y el 91,1 % del dataset sintético se distingue de
+  la auditoría sobre datos reales (`c3814b2`).
 
 ### Por hacer
 
 Ver [docs/ROADMAP.md](docs/ROADMAP.md). Prioridad inmediata: **DT-4** — separar
 selección de evaluación con un split en tres. Las métricas publicadas siguen
-sesgadas al alza mientras el test elija y evalúe al mismo tiempo. Después, DT-5:
-el servicio sigue sirviendo el modelo sintético.
+sesgadas al alza mientras el test elija y evalúe al mismo tiempo. Después, la parte
+pendiente de DT-5: decidir si el pipeline heredado de la raíz se migra o se elimina.
 
 ---
 

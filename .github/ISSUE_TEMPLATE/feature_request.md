@@ -26,6 +26,6 @@ labels: enhancement
 
 ## Consideraciones
 
-<!-- Nota: el proyecto tiene un defecto metodológico central abierto (DT-1,
-     target leakage). Las mejoras de modelado carecen de sentido hasta cerrarlo.
-     Ver docs/LEAKAGE_ANALYSIS.md -->
+<!-- Nota: el defecto central (DT-1, target leakage) está cerrado, pero las métricas
+     siguen sesgadas al alza mientras DT-4 esté abierto (el test elige y evalúa).
+     Las mejoras de modelado tienen poco sentido hasta cerrarlo. Ver docs/ROADMAP.md -->

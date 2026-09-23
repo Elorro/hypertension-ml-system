@@ -37,6 +37,6 @@ Resuelve: DT-
 - [ ] `make lint` en verde
 - [ ] `make test` en verde
 - [ ] Documentación afectada actualizada en este mismo PR
-- [ ] Si cambié el conjunto u orden de features, actualicé los **cinco** puntos de acoplamiento (ver `CONTRIBUTING.md`)
+- [ ] Si cambié el conjunto u orden de features, lo hice en `src/cardio_features.py`, reentrené y los tests de equivalencia pasan (ver `CONTRIBUTING.md`)
 - [ ] No añadí artefactos binarios, datos generados ni credenciales
 - [ ] Los avisos médicos siguen presentes en servicio, dashboard y docs

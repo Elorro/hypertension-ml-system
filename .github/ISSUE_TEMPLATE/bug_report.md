@@ -26,8 +26,8 @@ labels: bug
 
 - SO:
 - Python (`python --version`):
-- Instalación: `pip install -r requirements.txt` / otra
-- ¿Se ejecutó `make setup` antes? sí / no
+- Instalación: `pip install -r requirements.lock.txt` / `requirements-serve.txt` / `requirements-dashboard.txt` / otra
+- ¿Existen `models/dt1_*.pkl` (`make train-real`) y pasa `make verify-env`? sí / no
 
 ## Contexto adicional
 

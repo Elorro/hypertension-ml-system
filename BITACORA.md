@@ -8,6 +8,135 @@ Formato: entradas descendentes (lo más reciente arriba).
 
 ---
 
+## 2026-09-23 (tarde) — El servicio pasa a los modelos reales de DT-1
+
+**Fase:** 3 (prototipo)
+
+### Qué se cerró
+
+La advertencia que arrastraba el proyecto desde DT-1 —«el sistema expone el `if`
+tautológico»— deja de ser cierta. La API y el dashboard sirven solo los modelos de
+DT-1; el contrato sintético se eliminó. Es la mitad de DT-5 que tocaba al servicio: la
+otra mitad (pipeline heredado de la raíz) sigue abierta.
+
+Commits, en orden:
+
+- **`86a5c29` — refactor.** `src/cardio_features.py` (features, derivación, cotas;
+  solo stdlib) y `src/artefactos.py` (versiones por perfil `entorno`/`servicio`,
+  sha256, carga sin warnings, identidad del scaler). `verify_env.py` y
+  `train_cardio_real.py` lo importan; ambos se ejecutan con `python -m`.
+- **`6e59035` — feat(api)!.** `POST /v1/riesgo-cardiovascular` (A′, probabilidad +
+  clase con umbral 0,5 explícito), `POST /v1/hipertension-sin-pa` (B1, sin clase),
+  `/lote` para ambos (≤ 1.000 filas, errores por índice), `GET /health`,
+  `GET /v1/modelos`. Eliminado `POST /predecir`. Versión del proyecto 2.0.0.
+- **`73c84ea` — feat(api).** `title` y `x-etiquetas` en el esquema, para que el
+  dashboard no repita nada del dominio.
+- **`a9b89ee` — feat(dashboard).** Cliente HTTP puro de la API nueva.
+
+Push: `86a5c29` y `6e59035` los subió Luis; `6e59035..a9b89ee`, en esta sesión.
+
+### Verificación
+
+- **Equivalencia sin reentrenar** (`86a5c29`): DataFrame limpio, índices de split y
+  matrices X/y de los tres experimentos, idénticos bit a bit a c3814b2 (hashes
+  congelados en `tests/test_equivalencia_features.py`). La matriz que arma la API desde
+  unidades humanas es idéntica bit a bit a la del entrenamiento sobre las 68.586 filas
+  con presión plausible. Salida de `make audit-real` idéntica a HEAD (+2,28 pp PASA;
+  control positivo +33,60 pp FALLA); probabilidades de `verify_env` idénticas.
+- **Tests:** 90 en local, todos pasan. En una copia sin `.pkl` ni CSV (simulación de
+  CI): pasan los de contrato y los de integración se saltan con motivo visible. CI de
+  GitHub: `success` en `6e59035` y `a9b89ee` (`gh run list`; los logs no son
+  accesibles sin permisos de administrador).
+- **Sesión real con curl** desde un venv solo con `requirements-serve.txt` (293 MB, sin
+  pandas ni xgboost): un caso válido por endpoint, `ap_hi` enviado a B1 → 422, fuera de
+  dominio → 422 con la cota violada, `/predecir` → 404. RSS del proceso con A′ + B1 y
+  `n_jobs=1`: 352 MiB tras cargar, 357 MiB tras lotes de 1.000 filas.
+- **Fail fast:** con una copia alterada de `dt1_hta_b1__scaler.pkl`, uvicorn no arranca
+  (`ArtefactoInvalido: [hta_b1] sha256 distinto …`).
+- **Dashboard:** venv solo con `requirements-dashboard.txt` (456 MB, sin scikit-learn)
+  importa `app/dashboard.py` sin cargar sklearn. API caída (puerto cerrado y API
+  apagada): 26 intentos en 75 s y mensaje explícito con botón Reintentar. API que
+  arranca tarde: se recupera sola. `streamlit run` real: health `ok`.
+
+### Decisiones tomadas
+
+- **Contrato binario centrado en la probabilidad.** A′ devuelve clase con umbral
+  explícito; B1 no, porque con umbral 0,5 deja 3.156 FN frente a 1.559 VP.
+- **Redacción:** «probabilidad (ECE medido en test: …)», nunca «calibrada». Los RF no
+  llevan calibración post-hoc.
+- **Dominio de entrada = dominio de entrenamiento.** Edad [29, 65] años (29,56–64,92
+  redondeado hacia afuera; se rechaza en vez de avisar porque un árbol no extrapola).
+  IMC calculado en el servidor; en B1, enviar la presión es 422.
+- **joblib 1.6.0 como referencia de versión**, tomada del lock porque el manifiesto no
+  la registra (constante en `src/artefactos.py`; no se tocó el manifiesto).
+- **`scripts/audit_cardio_leakage.py` conserva su limpieza independiente**, a propósito.
+- **Codificación de `gender`:** 1/2 con «hombre/mujer» marcado como inferido en API,
+  dashboard y docs.
+- **El pipeline sintético se conserva** como evidencia del leakage, fuera del servicio.
+
+### Corrección a la entrada de `f508c85`
+
+El mensaje de `f508c85` dice que `verify_env` comprueba el sha256 del CSV. No lo hacía
+entonces ni lo hace ahora: comprueba los `.pkl`. El sha256 del CSV lo verifica el test
+`test_csv_presente_es_el_del_manifiesto` (`86a5c29`).
+
+### Artefactos producidos
+
+`src/{cardio_features,artefactos}.py` · `api/{schemas,servicio}.py` y `api/main.py`
+reescrito · `app/dashboard.py` reescrito · `tests/` (contrato, integración,
+equivalencia, dashboard) · `requirements-{serve,dashboard}.txt` · `docs/API.md`
+reescrito. La revisión general de los `.md` va en el commit que añade esta entrada:
+model card nueva de A′ y B1 (`docs/MODEL_CARD.md`) y la sintética conservada como
+histórica (`docs/MODEL_CARD_SINTETICO.md`).
+
+### Siguiente paso
+
+**DT-4** — split en tres sobre `src/train_cardio_real.py`. Pendientes explícitos:
+
+- Decisión de plataforma de deploy. No hay despliegue público.
+- Manejo de los `.pkl` en deploy: ≈ 130 MB, fuera de git.
+- `data/README.md` con las instrucciones de descarga del dataset.
+- Nota de uso de IA en el desarrollo del proyecto.
+- Decisión (a)/(b) sobre el pipeline heredado de la raíz (resto de DT-5).
+
+---
+
+## 2026-09-23 — Entorno reproducible, formato y CI bloqueante
+
+**Fase:** 3 (prototipo)
+
+### Qué pasó
+
+Cinco commits de infraestructura y documentación, sin cambio de comportamiento del
+modelo:
+
+- **`4b3b5d4`** — `.gitignore` pasa de ignorar `data/real/*.zip` a ignorar `data/real/`
+  completo, para que el CSV de Kaggle no se vuelva a añadir. Contexto: el CSV estuvo
+  versionado; al detectarse que su licencia es desconocida se purgó de toda la historia
+  con `git filter-repo` y ya no se redistribuye (se descarga de la fuente). El purgado
+  es una reescritura de historia, no este commit, que solo toca `.gitignore`.
+- **`f508c85`** — entorno reproducible en Python 3.14.6: numpy, pandas, scikit-learn y
+  xgboost fijados con `==` a las versiones del manifiesto de DT-1;
+  `requirements.lock.txt` con el grafo completo (versiones, no hashes);
+  `scripts/verify_env.py` y `make verify-env` como compuerta; CI en 3.14 desde el lock.
+  Cierra el hallazgo de entorno de la entrada del 2026-09-21 y DT-11.
+- **`0e75317`** — `ruff format` en todo el repo más dos autofix UP037. Verificado en el
+  commit: AST idéntico salvo esas dos anotaciones y salida de `audit_cardio_leakage.py`
+  byte-idéntica.
+- **`d6d1b0f`** — el job de lint de CI pasa a ser bloqueante (`ruff format --check`) y
+  `0e75317` queda en `.git-blame-ignore-revs`.
+- **`c3814b2`** — docs: se retira el conteo de líneas de la regla `if`, que no cuadraba
+  con ningún bloque real; el bloque de LEAKAGE_ANALYSIS §1 coincide con
+  `regla_completa` en 50.000/50.000 filas. El 91,1 % queda rotulado como sintético y se
+  contrasta con la auditoría real.
+
+### Verificación
+
+CI de GitHub en `success` para `4b3b5d4`, `f508c85`, `d6d1b0f` y `c3814b2`
+(`gh run list`). `0e75317` se subió junto con otros commits y no tiene corrida propia.
+
+---
+
 ## 2026-09-21 — DT-1 cerrado: el proyecto pasa a ser predictivo
 
 **Fase:** 2 (validación matemática) — **compuerta superada**
@@ -265,7 +394,8 @@ con el CSV ya descomprimido).
 
 **Fase:** 3 (prototipo)
 
-Commit `72cae30`. Pipeline completo funcionando:
+Commit `49c9f1a` (hash actual tras la reescritura con `git filter-repo`; equivalencia
+en `.git/filter-repo/commit-map`). Pipeline completo funcionando:
 
 - Generador de dataset sintético (50.000 filas, 15 features, 4 clases).
 - Entrenamiento de 5 modelos clásicos con selección automática por macro-F1.

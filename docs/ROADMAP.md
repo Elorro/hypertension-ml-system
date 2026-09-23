@@ -3,7 +3,7 @@
 Trabajo pendiente, ordenado por severidad. Cada entrada indica el problema, su
 efecto real y el criterio de aceptación que la cierra.
 
-**Leyenda de prioridad:** 🔴 bloqueante · 🟡 importante · 🟢 mejora
+**Leyenda de prioridad:** 🔴 bloqueante · 🟡 importante · 🟢 mejora. Estado: ✅ resuelto · ◐ parcial (en el diagrama final)
 
 ---
 
@@ -34,11 +34,11 @@ que es lo que demuestra que el buscador de reglas sí detecta leakage cuando exi
 
 Resultados completos y sus límites: [DT1_RESULTS.md](DT1_RESULTS.md).
 
-**Lo que NO cierra.** El servicio (`api/main.py`) sigue cargando el modelo sintético;
-migrarlo es parte de DT-5. Y las métricas de arriba siguen sesgadas al alza por
-DT-3/DT-4, que continúan abiertos.
+**Lo que NO cerraba.** El servicio seguía cargando el modelo sintético; se migró a
+los artefactos `dt1_*` en `6e59035` (2026-09-23). Las métricas de arriba siguen
+sesgadas al alza por DT-3/DT-4, que continúan abiertos.
 
-### 🔴 DT-2 · Corregir el escalado antes del split
+### ✅ DT-2 · Corregir el escalado antes del split — *resuelto en el camino de servicio (2026-09-23)*
 
 **Problema.** `src/train_classical_models.py` ejecuta `scaler.fit_transform(X)`
 sobre el dataset completo y **después** hace `train_test_split`. La media y la
@@ -59,8 +59,12 @@ que incluyan el conjunto de test.
 
 **Estado parcial (2026-09-17).** `src/train_cardio_real.py` ya ajusta el scaler
 exclusivamente sobre train y persiste el `StandardScaler` junto a sus `mean_`/`scale_`
-en el manifiesto. `src/train_classical_models.py` —el que alimenta al servicio— sigue
-con el defecto. DT-2 se cierra cuando el servicio deje de depender de ese script.
+en el manifiesto. `src/train_classical_models.py` sigue con el defecto. DT-2 se cierra
+cuando el servicio deje de depender de ese script.
+
+**Cierre (2026-09-23).** Desde `6e59035` el servicio carga solo los artefactos `dt1_*`.
+`src/train_classical_models.py` conserva el defecto a propósito: forma parte de la
+evidencia reproducible del leakage y no alimenta ningún servicio.
 
 ### 🔴 DT-3 · Split estratificado y validación cruzada
 
@@ -103,7 +107,7 @@ que queda abierto en el pipeline real.
 
 ## Fase 2 — Consolidación del código
 
-### 🟡 DT-5 · Unificar los dos pipelines
+### 🟡 DT-5 · Unificar los dos pipelines — *parcial*
 
 **Problema.** El repositorio contiene dos implementaciones paralelas e
 incompatibles. Los scripts de la raíz (`data_pipeline.py`, `train_models.py`,
@@ -130,9 +134,15 @@ de familias de modelos.
 **Criterio de aceptación.** Un solo esquema de columnas, un solo generador, un solo
 script de entrenamiento. Ningún archivo huérfano en la raíz.
 
-### 🟡 DT-6 · Suite de tests
+**Estado parcial (2026-09-23).** El camino de servicio ya no depende del pipeline
+sintético: `api/` y `app/` sirven solo los modelos de DT-1 (`6e59035`, `a9b89ee`) y
+el contrato `POST /predecir` se eliminó. El generador y `train_classical_models.py`
+se conservan como evidencia del leakage. Sigue pendiente lo que define esta tarea: la
+decisión (a)/(b) sobre los scripts de la raíz, que no se han tocado.
 
-**Problema.** Cero tests. Ninguna garantía de no-regresión.
+### 🟡 DT-6 · Suite de tests — *parcial*
+
+**Problema.** No había tests. Ninguna garantía de no-regresión.
 
 **Cobertura mínima propuesta.**
 
@@ -145,16 +155,30 @@ script de entrenamiento. Ningún archivo huérfano en la raíz.
 
 **Criterio de aceptación.** `pytest` verde en CI, cobertura > 70 % sobre `src/` y `api/`.
 
-### 🟡 DT-7 · Validación de rangos en el servicio
+**Estado parcial (2026-09-23).** Hay suite (`86a5c29`, `6e59035`, `a9b89ee`): 90 tests
+en local. Los de contrato de la API y del dashboard corren en CI con un doble del
+modelo; los de integración (`requires_artifacts`, `requires_data`) se saltan en CI con
+el motivo visible. El contrato de features está cubierto: la matriz de la API es
+idéntica bit a bit a la del entrenamiento sobre el CSV. El plan de arriba (con
+`/predecir`) quedó superado por el contrato nuevo. Falta el criterio de cobertura:
+65 % sobre `src/` + `api/` en local, arrastrado por `generate_dataset.py` y
+`train_classical_models.py` sin tests.
 
-**Problema.** El esquema Pydantic valida tipos, no plausibilidad. `PAS: 900` se
-acepta y devuelve una predicción sin sentido.
+### ✅ DT-7 · Validación de rangos en el servicio — *resuelto (2026-09-23)*
+
+**Problema.** El esquema Pydantic validaba tipos, no plausibilidad. `PAS: 900` se
+aceptaba y devolvía una predicción sin sentido.
 
 **Solución.** `Field(ge=..., le=...)` en cada campo, más un validador cruzado que
 verifique `PAD < PAS` y la coherencia de `IMC` con `Peso`/`Talla`.
 
 **Criterio de aceptación.** Entradas fisiológicamente imposibles devuelven `422` con
 mensaje explicativo.
+
+**Cierre (`6e59035`).** La entrada del contrato nuevo se valida contra el dominio de
+entrenamiento (`src/cardio_features.py`): `Field(ge, le)` por campo, IMC calculado en
+el servidor y validado, `ap_lo < ap_hi` y presión plausible. El 422 dice qué cota se
+violó. Cubierto por los tests de contrato.
 
 ### ✅ DT-8 · Manejo de errores y `except` desnudo — *resuelto*
 
@@ -166,22 +190,30 @@ explícito de la causa.
 
 ## Fase 3 — Robustez operativa
 
-### 🟢 DT-9 · Endpoint batch
+### ✅ DT-9 · Endpoint batch — *resuelto (2026-09-23)*
 
-El dashboard emite una petición HTTP por fila del CSV. Un archivo de 10.000
-pacientes genera 10.000 llamadas. Añadir `POST /predecir_batch` que acepte una lista
+El dashboard emitía una petición HTTP por fila del CSV. Un archivo de 10.000
+pacientes generaba 10.000 llamadas. Añadir `POST /predecir_batch` que acepte una lista
 y responda con un array.
+
+**Cierre.** `POST /v1/riesgo-cardiovascular/lote` y `POST /v1/hipertension-sin-pa/lote`
+(`6e59035`): hasta 1.000 filas, errores por índice sin tumbar el lote. El dashboard
+los usa por bloques (`a9b89ee`).
 
 ### 🟢 DT-10 · Logging estructurado
 
 Sin trazabilidad de peticiones. Añadir logging JSON con `request_id`, latencia y
 clase predicha — sin persistir datos clínicos de entrada.
 
-### 🟢 DT-11 · Fijar versiones de dependencias
+### ✅ DT-11 · Fijar versiones de dependencias — *resuelto (2026-09-23)*
 
 `requirements.txt` no fija versiones exactas. Un `pip install` hoy y en seis meses
 producen entornos distintos. Generar un lock con `pip freeze > requirements.lock.txt`
 tras validar que la suite pasa.
+
+**Cierre (`f508c85`).** `requirements.lock.txt` fija el grafo completo; numpy, pandas,
+scikit-learn y xgboost van con `==` a las versiones del manifiesto de DT-1, y
+`make verify-env` es la compuerta. Límite declarado: fija versiones, no hashes.
 
 ### 🟡 DT-17 · `SVC(probability=True)` deprecado
 
@@ -233,8 +265,8 @@ poder comparar corridas.
 ### 🟢 DT-14 · Interpretabilidad
 
 Valores SHAP sobre el modelo ganador, expuestos en el dashboard. En un dominio
-clínico, una predicción sin explicación es inutilizable. Nota: solo tiene sentido
-después de DT-1 — sobre el dataset actual, SHAP se limitaría a confirmar que
+clínico, una predicción sin explicación es inutilizable. Nota: solo tenía sentido
+después de DT-1 — sobre el dataset sintético, SHAP se limitaría a confirmar que
 `PAS` y `PAD` lo explican todo, que es la definición del target.
 
 ### 🟢 DT-15 · Análisis de equidad
@@ -244,21 +276,26 @@ que afecte a personas.
 
 ### 🟢 DT-16 · Calibración de probabilidades
 
-El dashboard muestra probabilidades como si fueran confianzas calibradas. Verificar
+El dashboard mostraba probabilidades como si fueran confianzas calibradas. Verificar
 con curvas de calibración y aplicar `CalibratedClassifierCV` si hace falta.
+
+**Estado parcial (2026-09-23).** La verificación existe para los modelos servidos:
+curvas de calibración en el manifiesto y ECE de 0,0118 (A′) y 0,0069 (B1), medidos
+sobre el mismo test que eligió al ganador (DT-4). No se aplicó calibración post-hoc.
+La API y el dashboard dicen «probabilidad (ECE medido en test: …)», no «calibrada».
 
 ---
 
 ## Orden de ejecución sugerido
 
 ```
-DT-1 ✅ ─► DT-2 ──► DT-3 ──► DT-4      Fase 1: sin esto, nada más importa
+DT-1 ✅ ─► DT-2 ✅ ─► DT-3 ──► DT-4      Fase 1: sin esto, nada más importa
                               │
                               ▼
-                    DT-5 ──► DT-6 ──► DT-7, DT-8      Fase 2
+                    DT-5 ◐ ─► DT-6 ◐ ─► DT-7 ✅, DT-8 ✅      Fase 2
                                           │
                                           ▼
-                              DT-9 … DT-13             Fase 3
+                              DT-9 ✅ … DT-13 (DT-11 ✅)     Fase 3
                                           │
                                           ▼
                               DT-14 … DT-16            Fase 4

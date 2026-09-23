@@ -166,3 +166,26 @@ está hecho en `notebooks/EDA_cardiovascular_real.ipynb`.
 
 *Última verificación: 2026-07-24, sobre `data/raw/dataset_hipertension_sintetico.csv`
 (50.000 filas, seed=42).*
+
+---
+
+## Actualización (2026-09-23)
+
+Este documento registra la auditoría del 2026-07-24 y no se reescribe. Lo que cambió
+después:
+
+- **Se tomó el camino A de §6.** DT-1 entrena sobre el dataset real con la presión
+  excluida de las features de B1 (`d3ce87c`); resultados y criterio de aceptación con
+  control positivo en [DT1_RESULTS.md](DT1_RESULTS.md).
+- **El servicio dejó de exponer el modelo con leakage** (`6e59035`). La API sirve solo
+  los modelos de DT-1 y `POST /predecir` se eliminó. `src/generate_dataset.py`,
+  `src/train_classical_models.py` y `scripts/verify_leakage.py` se conservan como
+  evidencia reproducible de este análisis; sus defectos (§5, filas 1–4) siguen en ese
+  código a propósito.
+- **§5, fila 6 («Sin tests»):** hay suite de tests desde `86a5c29` (ver
+  [ROADMAP.md](ROADMAP.md), DT-6).
+- **§6, «El dataset real ya está en el repositorio»:** era cierto entonces. El CSV de
+  Kaggle se versionó, pero al detectarse que su licencia es desconocida se purgó de
+  toda la historia con `git filter-repo` y ya no se redistribuye; `.gitignore` ignora
+  `data/real/` completo desde `4b3b5d4`. Hay que descargarlo de la fuente; ver
+  [DATA.md](DATA.md).

@@ -1,157 +1,144 @@
-# Model Card — Clasificador de Hipertensión Arterial
+# Model Card — Riesgo cardiovascular (A′) e hipertensión sin presión arterial (B1)
 
 Formato basado en *Model Cards for Model Reporting* (Mitchell et al., 2019).
 
-> **Alcance de esta ficha.** Describe el modelo **sintético** que sirve `api/main.py`
-> (`models/modelo_*.pkl`), cuyo target es una función determinista de las features.
-> Los modelos entrenados sobre datos reales en DT-1 (`models/dt1_*.pkl`) **no** están
-> cubiertos aquí: son binarios, tienen otro esquema de features y todavía no se
-> exponen en ningún servicio. Sus métricas, límites y criterio de aceptación están en
-> [DT1_RESULTS.md](DT1_RESULTS.md). Esta ficha se reescribirá cuando el servicio
-> migre a esos artefactos (DT-5).
+> **Alcance.** Describe los dos modelos que sirve la API desde `6e59035`
+> (`models/dt1_riesgo_cv_con_pa__*.pkl` y `models/dt1_hta_b1__*.pkl`), entrenados en
+> DT-1 sobre el dataset real. Toda cifra sale de `models/dt1_manifest.json`; el
+> análisis completo está en [DT1_RESULTS.md](DT1_RESULTS.md). El modelo sintético
+> anterior tiene su propia ficha histórica: [MODEL_CARD_SINTETICO.md](MODEL_CARD_SINTETICO.md).
 
 ---
 
 ## Detalles del modelo
 
-| Campo | Valor |
-|-------|-------|
-| **Desarrollador** | Luis Araque |
-| **Versión** | 1.0.0 |
-| **Fecha** | Enero 2026 |
-| **Tipo** | Clasificador multiclase (4 clases), aprendizaje supervisado |
-| **Algoritmos evaluados** | Regresión Logística, SVM-RBF, Árbol de Decisión, Random Forest, XGBoost |
-| **Criterio de selección** | Macro-F1 sobre conjunto de test (20 %) |
-| **Preprocesamiento** | `StandardScaler` sobre las 15 features numéricas |
-| **Licencia** | MIT |
+| Campo | A′ `riesgo_cv_con_pa` | B1 `hta_b1` |
+|-------|-----------------------|-------------|
+| **Rol** | Principal | Experimental |
+| **Target** | `cardio`: enfermedad cardiovascular, etiqueta original del dataset | `hta = (ap_hi ≥ 140) ∨ (ap_lo ≥ 90)`, umbral JNC7/ESC fijado a priori |
+| **Features** | 12: edad, sexo, talla, peso, IMC, colesterol, glucosa, tabaco, alcohol, actividad, `ap_hi`, `ap_lo` | Las mismas 10 sin `ap_hi`/`ap_lo` (verificado por linaje) |
+| **Algoritmo servido** | Random Forest (300 árboles, `max_depth=12`) | Random Forest (300 árboles, `max_depth=12`) |
+| **Salida de la API** | Probabilidad + clase con umbral 0,5 explícito | Solo probabilidad |
 
-**Entrada:** vector de 15 features clínicas y de estilo de vida (ver
-[DATA.md](DATA.md)).
-**Salida:** clase predicha (0–3) y, cuando el algoritmo lo soporta, distribución de
-probabilidad sobre las cuatro clases.
+Comunes a ambos:
+
+- **Desarrollador:** Luis Araque. **Licencia:** MIT.
+- **Corrida de referencia:** 2026-09-17, `src/train_cardio_real.py`, `seed=42`,
+  Python 3.14.6 · scikit-learn 1.9.1 · numpy 2.5.3.
+- **Preprocesamiento:** `StandardScaler` ajustado solo sobre train. El IMC se calcula
+  como `weight / (height/100)²`; la edad, como `age / 365.25` (años, float).
+- **Selección:** 5 algoritmos (regresión logística, SVM-RBF, árbol, Random Forest,
+  XGBoost), elegidos por macro-F1 **sobre el mismo test que reporta las métricas**
+  (DT-4 abierto).
+- **Probabilidades:** sin calibración post-hoc; su calibración se mide con ECE
+  (10 bins uniformes) en test.
 
 ## Uso previsto
 
-**Uso primario:** demostración educativa de un pipeline de ML end-to-end —
-generación de datos, comparación de algoritmos, despliegue como servicio y consumo
-desde una interfaz.
+**Uso primario:** demostración de ingeniería de ML: entrenamiento auditado sobre datos
+reales, servicio con contrato validado, y consumo desde una interfaz.
 
-**Usuarios previstos:** estudiantes y desarrolladores que evalúan la arquitectura
-del sistema o el código.
+**Usuarios previstos:** estudiantes y desarrolladores que evalúan la arquitectura o la
+metodología.
 
 **Fuera de alcance — usos explícitamente desaconsejados:**
 
-- Diagnóstico, tamizaje o triaje de pacientes reales.
+- Diagnóstico, tamizaje o triaje de pacientes reales. B1 en particular **no sustituye
+  la medición de la presión arterial**.
 - Cualquier decisión clínica, de tratamiento o de seguimiento.
-- Estimación de riesgo cardiovascular individual o poblacional.
 - Uso en contextos de seguros, empleo o cualquier decisión que afecte a personas.
+- Entradas fuera del dominio de entrenamiento: la API las rechaza con 422 (edad
+  [29, 65] años, talla [120, 220] cm, peso [30, 200] kg, IMC [12, 70] kg/m², PAS
+  [70, 250] y PAD [40, 200] mmHg con PAD < PAS).
 
 ## Factores
 
-**Grupos evaluados:** ninguno. No se ha realizado análisis de desempeño
-desagregado por sexo, grupo etario ni ninguna otra subpoblación.
+**Grupos evaluados:** ninguno. No hay análisis de desempeño desagregado por sexo ni
+por grupo etario (DT-15).
 
-**Instrumentación:** los datos son sintéticos; no provienen de ningún dispositivo
-de medición real. En un despliegue real, la variabilidad de esfigmomanómetros, la
-hipertensión de bata blanca y la hora de la medición serían factores de primer orden
-que este modelo ignora por completo.
+**Codificación de `gender`:** el dataset usa 1/2 sin documentar su significado. Que
+2 = hombre es una **inferencia** (talla media 169,9 vs. 161,4 cm, registrada en el
+manifiesto), no un dato de la fuente.
 
-## Métricas y por qué desconfiar de ellas
+**Instrumentación:** se desconoce cómo se midieron la presión y el resto de variables.
+El CSV contiene presiones imposibles (PAS de hasta 16.020, PAD negativas); la limpieza
+descarta la presión invertida y deja 92 filas implausibles, que no alteran las
+métricas (análisis de sensibilidad abajo). Colesterol y glucosa son ordinales (1–3),
+no valores de laboratorio. Tabaco, alcohol y actividad son autorreportados.
 
-**Métricas calculadas:** accuracy, macro-F1, ROC-AUC one-vs-rest.
+## Métricas
 
-**Advertencia central:** las métricas de este modelo **no miden capacidad
-predictiva**. El target del dataset de entrenamiento es una función determinista de
-las features de entrada. Un modelo con accuracy de 0,95 no detecta hipertensión con
-95 % de acierto: memorizó el umbral que generó la etiqueta.
+Test estratificado, n = 13.736; train n = 54.942.
 
-Evidencia cuantitativa, reproducible con `python scripts/verify_leakage.py`:
+| Métrica | A′ (con presión) | B1 (sin presión) |
+|---------|------------------|------------------|
+| AUC ROC [IC 95 % bootstrap] | 0,8017 [0,7937 · 0,8088] | 0,6941 [0,6849 · 0,7035] |
+| AUC en train | 0,8585 | 0,8027 |
+| PR-AUC (baseline = prevalencia) | 0,7874 (0,4948) | 0,5277 (0,3433) |
+| Brier (baseline: predecir la prevalencia) | 0,1808 (0,2500) | 0,2020 (0,2254) |
+| ECE, 10 bins uniformes | 0,0118 | 0,0069 |
+| Accuracy con umbral 0,5 (baseline clase mayoritaria) | 73,33 % (50,52 %) | 68,92 % (65,67 %) |
+| Matriz de confusión, umbral 0,5 (VN · FP · FN · VP) | 5.468 · 1.471 · 2.193 · 4.604 | 7.908 · 1.113 · 3.156 · 1.559 |
 
-| Referencia | Accuracy |
-|------------|----------|
-| Baseline clase mayoritaria | 29,6 % |
-| **Regla `if` sobre PAS/PAD, sin entrenamiento** | **61,9 %** |
-| **Regla completa del generador, sin entrenamiento** | **91,1 %** |
-| Regresión Logística (entrenada) | 47,7 % |
-| SVM RBF (entrenada) | 68,8 % |
-| Árbol de Decisión, `max_depth=8` (entrenado) | 94,8 % |
-| Random Forest, 300 árboles (entrenado) | 94,8 % |
-| XGBoost, 400 árboles (entrenado) | 95,3 % |
+Cómo leerlas:
 
-Una regla `if` determinista, sin entrenar (`scripts/verify_leakage.py::regla_completa`),
-recupera el 91,1 % de las etiquetas del dataset sintético. Cualquier modelo entrenado
-compite contra esa cifra, no contra el 29,6 % del azar. Leída así, la tabla dice que
-400 árboles boosteados mejoran unos pocos puntos sobre esa regla — y que **un solo
-árbol de profundidad 8 ya alcanza 94,8 %**, a 0,5 puntos del ganador.
+- **B1 tiene señal, y es modesta.** El IC del AUC está lejos de 0,5, pero la accuracy
+  supera al baseline en solo +3,25 pp y con umbral 0,5 deja 3.156 falsos negativos
+  frente a 1.559 verdaderos positivos. La información está en el ranking. Por eso la
+  API no devuelve clase para B1.
+- **Los algoritmos empatan.** En B1, Random Forest 0,6941 vs. regresión logística
+  0,6924, con un IC de ±0,009. En A′, Random Forest 0,8017 vs. XGBoost 0,7986. Que el
+  servido sea Random Forest no significa que «ganó»: lo defendible es el techo de AUC
+  de cada problema.
+- **Sobreajuste de los hiperparámetros heredados.** La brecha train → test del AUC es
+  de 0,057 en A′ y de 0,109 en B1.
+- **Cuánto vale medir la presión:** en la ablación de A′ (mismas filas, bootstrap
+  pareado), quitar `ap_hi`/`ap_lo` cuesta Δ AUC = 0,1103 [0,1027 · 0,1181].
+- **Sensibilidad:** excluyendo de test las filas con presión implausible, el AUC no se
+  mueve (A′ 0,8017 → 0,8017 sin 24 filas; B1 0,6941 → 0,6944 sin 20).
 
-Contraste con el dataset real (DT-1, sin la presión en las features): la mejor regla
-determinista que encuentra `scripts/audit_cardio_leakage.py` supera al baseline de
-clase mayoritaria en solo +2,28 pp, mientras que con `ap_hi`/`ap_lo` (control
-positivo) reconstruye el target al 99,27 %.
-
-El patrón más diagnóstico está en la brecha entre familias: los modelos basados en
-árboles llegan a ~95 % y los lineales o de kernel se quedan en 48–69 %. El target es
-una partición por umbrales; los árboles la representan de forma nativa y los modelos
-lineales no pueden. La geometría del problema es la de un `if`, no la de un fenómeno
-clínico.
-
-Análisis completo en [LEAKAGE_ANALYSIS.md](LEAKAGE_ANALYSIS.md).
-
-**Sesgo adicional en el reporte:** el conjunto de test se usa tanto para
-seleccionar el mejor modelo como para reportar su desempeño. El F1 publicado del
-ganador está sesgado al alza por selección. Faltaría un split train/validación/test.
+**Sesgo en el reporte:** el mismo test eligió al ganador entre 5 algoritmos, así que
+todas las cifras están sesgadas al alza por selección (DT-4). Es además una sola
+partición: el IC bootstrap acota el ruido de muestreo del test, no el de partición
+(DT-3).
 
 ## Datos de entrenamiento
 
-50.000 registros sintéticos generados por `src/generate_dataset.py` con `seed=42`.
-Las features se muestrean de distribuciones **independientes** — normales o
-binomiales — recortadas a rangos plausibles.
+*Cardiovascular Disease Dataset* (Kaggle), 70.000 filas → 68.678 tras una limpieza
+declarada a priori: 24 duplicados exactos, 1.236 filas con presión invertida
+(`ap_lo ≥ ap_hi`) y 62 con antropometría imposible. Prevalencias: `cardio` 49,48 %,
+`hta` 34,33 %. Detalle en [DATA.md](DATA.md) y [DT1_RESULTS.md](DT1_RESULTS.md) §2.
 
-**Limitación estructural:** la independencia entre variables es falsa. En población
-real, la edad, el IMC, el colesterol y la presión arterial están fuertemente
-correlacionados. Un modelo entrenado sobre features independientes aprende una
-geometría del espacio de entrada que no existe fuera del generador.
-
-Distribución de clases: 26,2 % / 29,6 % / 26,8 % / 17,4 % (clases 0–3). Balance
-artificial, muy distinto de la prevalencia poblacional real de HTA.
+Criterio de aceptación de DT-1 (`scripts/audit_cardio_leakage.py`): sin la presión,
+ninguna regla determinista supera al baseline por más de +2,28 pp; con la presión
+(control positivo), la misma maquinaria reconstruye `hta` al 99,27 %.
 
 ## Datos de evaluación
 
-Split aleatorio del 20 % del **mismo dataset sintético**. No hay conjunto de
-validación externo ni evaluación sobre datos reales.
-
-El repositorio incluye un dataset clínico real (`data/real/cardio/cardio_train.csv`,
-70.000 pacientes) usado **solo para EDA**, nunca para entrenar ni validar. Cerrar
-esa brecha es el hito principal del [ROADMAP](ROADMAP.md).
+El 20 % estratificado del mismo dataset. No hay validación externa ni temporal: un
+solo dataset, de una sola procedencia.
 
 ## Consideraciones éticas
 
-**Riesgo clínico.** Un sistema que emite la cadena "Hipertensión Grado 2" puede
-inducir confianza injustificada, tanto en falsos positivos (ansiedad, consultas
-innecesarias) como en falsos negativos (retraso en atención real). Por eso cada
-respuesta del servicio y cada vista del dashboard incluyen un aviso explícito de no
-sustitución de criterio médico.
+**Riesgo clínico.** Una probabilidad presentada sin contexto puede inducir confianza
+injustificada. Por eso cada respuesta de la API lleva `prevalencia_base` y un `aviso`
+de no uso clínico, B1 va rotulado como experimental y sin clase, y el dashboard
+muestra la advertencia en cada vista.
 
-**Ausencia de análisis de equidad.** No se ha medido el desempeño por sexo ni por
-grupo etario. Sobre datos sintéticos con generación simétrica el análisis sería
-vacío; sobre datos reales sería obligatorio antes de cualquier uso.
+**Equidad.** Sin análisis por subgrupo, y con el sexo codificado por inferencia. Es
+obligatorio antes de cualquier uso que afecte a personas (DT-15).
 
-**Privacidad.** El entrenamiento no usa datos de personas reales. El servicio no
-persiste las peticiones recibidas: procesa en memoria y responde. Un despliegue
-real con datos de pacientes quedaría sujeto a normativa de datos sensibles de salud
-(en Colombia, Ley 1581 de 2012 y sus decretos reglamentarios), lo que exigiría
-consentimiento informado, cifrado en tránsito y reposo, y registro de auditoría.
+**Privacidad.** El servicio no persiste las peticiones: procesa en memoria y responde.
+Un despliegue real con datos de pacientes quedaría sujeto a la normativa de datos
+sensibles de salud (en Colombia, Ley 1581 de 2012 y sus decretos reglamentarios).
 
 ## Advertencias y recomendaciones
 
 1. **No usar en contexto clínico.** Sin excepción.
-2. **No citar las métricas fuera de contexto.** Cualquier número de este proyecto
-   debe acompañarse del análisis de leakage.
-3. **Antes de cualquier uso serio:** reentrenar sobre datos reales excluyendo
-   `PAS`/`PAD` de las features, con validación cruzada estratificada, split
-   train/val/test separado, y análisis de desempeño desagregado por subgrupo.
-4. **Validar rangos de entrada.** El esquema Pydantic valida tipos, no plausibilidad
-   fisiológica. Valores absurdos producen predicciones sin sentido, sin aviso.
+2. **No citar las métricas sin su baseline** ni sin la nota de sesgo por DT-4.
+3. **Antes de cualquier uso serio:** split train/validación/test (DT-4), validación
+   cruzada (DT-3), análisis de equidad (DT-15) y validación externa.
+4. **No hay despliegue público.** El servicio corre en local.
 
 ---
 

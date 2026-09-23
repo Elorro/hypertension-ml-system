@@ -7,30 +7,31 @@ Complementa las reglas globales de `~/.claude/CLAUDE.md`.
 
 ## Qué es este proyecto
 
-Sistema end-to-end de clasificación de hipertensión arterial en 4 niveles.
-Pipeline: generación de datos → entrenamiento comparativo de 5 modelos → servicio
-FastAPI → dashboard Streamlit.
+Sistema end-to-end sobre el dataset real *Cardiovascular Disease* (Kaggle):
+entrenamiento comparativo de 5 modelos (DT-1) → servicio FastAPI que devuelve
+probabilidades de A′ (riesgo cardiovascular, con presión) y B1 (hipertensión sin
+presión, experimental) → dashboard Streamlit. El pipeline sintético original (4 niveles
+de HTA) se conserva solo como evidencia del target leakage.
 
 **Naturaleza real del proyecto:** demostración de ingeniería de ML, no herramienta
 clínica. Ver la sección de estado antes de proponer cualquier trabajo.
 
 ## Fase actual
 
-**Fase 3 (prototipo). Compuerta de Fase 2 superada en el entrenamiento, no en el
-servicio.**
+**Fase 3 (prototipo). El servicio sirve los modelos reales de DT-1 desde `6e59035`.**
 
 | Fase | Estado |
 |------|--------|
 | 1. Diseño | ✅ Completa |
 | 2. Validación matemática | ⚠️ DT-1 cerrado; DT-3/DT-4 abiertos |
-| 3. Prototipo | ✅ Funcional (sirviendo el modelo sintético) |
-| 4. Testing | ⬜ No iniciada |
+| 3. Prototipo | ✅ Funcional (API y dashboard sobre A′ y B1) |
+| 4. Testing | ◐ Suite de contrato e integración (DT-6 parcial: cobertura 65 % < 70 %) |
 
 No proponer optimización de hiperparámetros, modelos nuevos ni despliegue hasta
-cerrar **DT-4** (el test elige y evalúa al mismo tiempo) y **DT-5** (el servicio
-sigue cargando el modelo sintético).
+cerrar **DT-4** (el test elige y evalúa al mismo tiempo). No hay despliegue público;
+plataforma y manejo de los `.pkl` en deploy están sin decidir.
 
-## El defecto que dominaba todo lo demás — cerrado en entrenamiento (2026-09-17)
+## El defecto que dominaba todo lo demás — cerrado en entrenamiento (2026-09-17) y en el servicio (2026-09-23)
 
 El target del dataset sintético es una **función determinista de las features**.
 `Diagnostico` se calcula con umbrales sobre `PAS`/`PAD`, y esas mismas columnas se
@@ -67,20 +68,30 @@ la presión, con accuracy apenas +3,25 pp sobre el baseline. **Los cinco algorit
 empatan dentro del ruido** — no presentar «ganó Random Forest». Detalle en
 `docs/DT1_RESULTS.md`.
 
-**Advertencia vigente:** `api/main.py` y el dashboard siguen cargando
-`models/modelo_*.pkl`, el modelo sintético. Lo que el sistema *expone* sigue siendo
-el `if` tautológico. Los artefactos de DT-1 llevan prefijo `dt1_`.
+**Qué cambió en el servicio (`6e59035`, `a9b89ee`).** `api/` y `app/` sirven solo los
+artefactos `dt1_*` (A′ y B1); `POST /predecir` y el contrato sintético se eliminaron.
+La API verifica versiones y sha256 contra `models/dt1_manifest.json` al arrancar y no
+arranca si algo no coincide. En API y docs se dice «probabilidad (ECE medido en test:
+…)», nunca «calibrada»; B1 no devuelve clase.
 
 ## Estructura y qué está vivo
 
 **Pipeline activo:**
 
 ```
+src/cardio_features.py          → fuente única de features, derivación y cotas (DT-1)
+src/train_cardio_real.py        → models/dt1_*.pkl + dt1_manifest.json  (python -m src.train_cardio_real)
+src/artefactos.py               → verificación de versiones y sha256 (API y verify_env)
+api/{main,schemas,servicio}.py  → FastAPI :8000 (A′ y B1)
+app/dashboard.py                → Streamlit :8501 (cliente HTTP puro, API_URL)
+```
+
+**Evidencia del leakage — conservar, fuera del servicio:**
+
+```
 src/generate_dataset.py         → data/raw/dataset_hipertension_sintetico.csv
-src/train_classical_models.py   → models/*.pkl + scaler.pkl + mejor_modelo.txt
-src/train_cardio_real.py        → models/dt1_*.pkl + dt1_manifest.json  (DT-1)
-api/main.py                     → FastAPI :8000
-app/dashboard.py                → Streamlit :8501 (cliente HTTP del servicio)
+src/train_classical_models.py   → models/modelo_*.pkl + scaler.pkl + mejor_modelo.txt
+scripts/verify_leakage.py
 ```
 
 **Pipeline heredado — no tocar sin decisión previa:**
@@ -100,9 +111,11 @@ Antes de modificar cualquier archivo de la raíz, confirmar con Luis si se migra
   la misma maquinaria detecta el leakage cuando existe no prueba nada.
 - **`scripts/audit_cardio_leakage.py` no importa sklearn.** Debe correr aunque el
   entorno de ML no esté instalado; mantenerlo en numpy + pandas.
-- **`Estres` sin tilde** en el pipeline activo. Con tilde solo en el heredado.
-- **Orden de features acoplado** entre 4 archivos + docs. Cambiarlo exige tocarlos
-  todos a la vez; ver `CONTRIBUTING.md`.
+- **`scripts/audit_cardio_leakage.py` reimplementa la limpieza a propósito.** No debe
+  importar `src/cardio_features.py`: es una verificación independiente.
+- **`Estres` sin tilde** en el pipeline sintético de `src/`. Con tilde solo en el heredado.
+- **Orden de features en un solo sitio:** `src/cardio_features.py`. Cambiarlo invalida
+  los `.pkl` de DT-1; los tests de equivalencia lo detectan. Ver `CONTRIBUTING.md`.
 - **Nunca versionar** `.pkl`, CSV generados ni el `.venv`.
 - **Avisos médicos** presentes en servicio, dashboard y docs. No retirarlos.
 - Documentación y docstrings en español; nombres de código en el idioma que ya usa
@@ -111,18 +124,19 @@ Antes de modificar cualquier archivo de la raíz, confirmar con Luis si se migra
 ## Comandos
 
 ```bash
-make setup       # dataset + entrenamiento (prerrequisito del servicio)
-make api         # uvicorn :8000
-make dashboard   # streamlit :8501
-make train-real  # DT-1: entrenamiento sobre datos reales (~51 min)
-make audit       # auditoría de leakage del dataset sintético
-make audit-real  # criterio de aceptación de DT-1 (solo numpy+pandas)
-make test        # pytest (suite aún no existe — DT-6)
-make lint        # ruff
+make train-real       # DT-1: entrenamiento sobre datos reales (~51 min), genera dt1_*.pkl
+make verify-env       # compuerta: versiones + sha256 + carga y predicción de los .pkl
+make serve-api        # uvicorn :8000 (alias: make api)
+make serve-dashboard  # streamlit :8501 (alias: make dashboard)
+make setup            # pipeline sintético (evidencia; no alimenta al servicio)
+make audit            # auditoría de leakage del dataset sintético
+make audit-real       # criterio de aceptación de DT-1 (solo numpy+pandas)
+make test             # pytest: contrato siempre; integración se salta sin .pkl/CSV
+make lint             # ruff check + ruff format --check
 ```
 
-El servicio carga el modelo en tiempo de import: sin `models/` poblado, `uvicorn`
-falla al arrancar.
+La API carga los modelos en el lifespan: sin `models/dt1_*.pkl` o con un sha256
+distinto al del manifiesto, no arranca.
 
 ## Trabajo pendiente
 

@@ -1,12 +1,12 @@
 # Datos: procedencia, diccionario y licencias
 
-El proyecto usa dos conjuntos de datos con roles distintos: uno **sintético**, sobre
-el que se entrenan los modelos, y uno **real**, usado únicamente para análisis
-exploratorio.
+El proyecto usa dos conjuntos de datos con roles distintos: uno **real**, sobre el que
+se entrenan los modelos que sirve la API (DT-1), y uno **sintético**, que se conserva
+como evidencia reproducible del target leakage y ya no alimenta ningún servicio.
 
 ---
 
-## 1. Dataset sintético (entrenamiento)
+## 1. Dataset sintético (evidencia del leakage)
 
 | Campo | Valor |
 |-------|-------|
@@ -78,7 +78,7 @@ Distribución resultante: 26,2 % / 29,6 % / 26,8 % / 17,4 %.
 
 ---
 
-## 2. Dataset real (solo EDA)
+## 2. Dataset real (entrenamiento de DT-1)
 
 | Campo | Valor |
 |-------|-------|
@@ -86,7 +86,9 @@ Distribución resultante: 26,2 % / 29,6 % / 26,8 % / 17,4 %.
 | Fuente | *Cardiovascular Disease Dataset*, Kaggle |
 | Filas | 70.000 |
 | Separador | `;` (punto y coma, no coma) |
-| Uso actual | Exclusivamente `notebooks/EDA_cardiovascular_real.ipynb` |
+| Uso actual | Entrenamiento de DT-1 (`src/train_cardio_real.py`), auditoría (`scripts/audit_cardio_leakage.py`) y EDA (`notebooks/EDA_cardiovascular_real.ipynb`) |
+| Limpieza | 70.000 → 68.678 filas; cotas en `src/cardio_features.py`, detalle en [DT1_RESULTS.md](DT1_RESULTS.md) §2 |
+| Versionado | Ya no. Se versionó; al detectarse que su licencia es desconocida se purgó de toda la historia con `git filter-repo` y ya no se redistribuye: se descarga de la fuente |
 
 ### Diccionario de variables
 
@@ -94,7 +96,7 @@ Distribución resultante: 26,2 % / 29,6 % / 26,8 % / 17,4 %.
 |---------|-------------|----------------------|
 | `id` | Identificador | entero |
 | `age` | Edad | **días** (dividir por 365,25 para años) |
-| `gender` | Sexo | 1 = Mujer, 2 = Hombre |
+| `gender` | Sexo | 1 / 2; «1 = Mujer, 2 = Hombre» es inferido (ver advertencias) |
 | `height` | Estatura | cm |
 | `weight` | Peso | kg |
 | `ap_hi` | Presión sistólica | mmHg |
@@ -111,20 +113,25 @@ Distribución resultante: 26,2 % / 29,6 % / 26,8 % / 17,4 %.
 - **`age` viene en días.** Olvidarlo produce análisis sin sentido.
 - **Valores de presión imposibles.** El dataset contiene `ap_hi` y `ap_lo` negativos
   o de magnitud absurda (miles). El notebook filtra con `between(80, 250)` y
-  `between(40, 200)`. Cualquier uso posterior debe repetir ese filtrado.
+  `between(40, 200)`. El entrenamiento de DT-1 descarta la presión invertida
+  (`ap_lo ≥ ap_hi`) y conserva 92 filas implausibles (análisis de sensibilidad en
+  [DT1_RESULTS.md](DT1_RESULTS.md)); la API solo acepta PAS [70, 250] y PAD [40, 200].
 - **Codificación de `gender` no documentada oficialmente.** La convención
   1 = Mujer / 2 = Hombre es la mayoritariamente aceptada, pero conviene verificarla
-  con un cruce contra la distribución de estatura antes de confiar en ella.
+  con un cruce contra la distribución de estatura antes de confiar en ella. Ese cruce
+  está hecho y registrado en el manifiesto de DT-1 (talla media 169,9 cm con código 2
+  vs. 161,4 cm con código 1): la correspondencia sigue siendo una inferencia, y así la
+  declaran la API y el dashboard.
 - **`cholesterol` y `gluc` son ordinales, no continuas.** No son directamente
   comparables con las columnas homónimas del dataset sintético, que están en mg/dL.
 
 ### Por qué este dataset importa
 
-Es el camino de salida del problema de leakage. Definiendo la etiqueta de
-hipertensión desde `ap_hi`/`ap_lo` y **excluyendo esas dos columnas de las
+Es el camino de salida del problema de leakage, y DT-1 lo tomó. Definiendo la
+etiqueta de hipertensión desde `ap_hi`/`ap_lo` y **excluyendo esas dos columnas de las
 features**, el problema pasa a ser genuinamente predictivo: estimar estado
 hipertensivo sin medir la presión, a partir de edad, IMC, colesterol, glucosa y
-hábitos. Ver [ROADMAP.md](ROADMAP.md).
+hábitos (experimento B1: AUC 0,6941). Ver [DT1_RESULTS.md](DT1_RESULTS.md).
 
 ---
 
@@ -136,11 +143,10 @@ hábitos. Ver [ROADMAP.md](ROADMAP.md).
 MIT. No contiene datos de personas reales.
 
 **Dataset de Kaggle:** se distribuye bajo los términos definidos por su autor
-original en la plataforma. ⚠️ **Los términos de redistribución no han sido
-verificados para este repositorio.** Antes de publicarlo, conviene confirmar la
-licencia en la página de origen del dataset. Si es restrictiva, la práctica correcta
-es **no versionar el archivo** y documentar en su lugar las instrucciones de
-descarga:
+original en la plataforma. ⚠️ **Su licencia es desconocida para este repositorio.**
+El CSV estuvo versionado; al detectarlo se purgó de toda la historia con
+`git filter-repo` y ya no se redistribuye. `.gitignore` ignora `data/real/` completo
+desde `4b3b5d4` para que no se vuelva a añadir. Se descarga de la fuente:
 
 ```bash
 # Requiere credenciales de Kaggle en ~/.kaggle/kaggle.json
@@ -148,6 +154,6 @@ kaggle datasets download -d sulianova/cardiovascular-disease-dataset -p data/rea
 unzip data/real/cardiovascular-disease-dataset.zip -d data/real/cardio/
 ```
 
-**Nota de higiene del repositorio:** `data/real/` contiene actualmente tanto el ZIP
-(744 KB) como el CSV ya descomprimido (2,9 MB). El ZIP es redundante y puede
-retirarse del control de versiones con `git rm --cached`.
+Tras descargarlo, el test `test_csv_presente_es_el_del_manifiesto` (`make test`)
+comprueba que el CSV sea el de la corrida de referencia (sha256 registrado en
+`models/dt1_manifest.json`).
