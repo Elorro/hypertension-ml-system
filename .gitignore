@@ -18,7 +18,7 @@ data/raw/
 data/processed/
 data/interim/
 data/external/
-data/real/*.zip
+data/real/
 
 # ---------- Reportes generados ----------
 reports/
