@@ -225,8 +225,10 @@ Más de 1.000 filas es un error del lote completo (sin eco de la entrada):
 ## `GET /v1/modelos`
 
 Metadatos desde el manifiesto, por modelo: `endpoint`, `definicion_target`,
-`entrada` (JSON Schema de cada campo con `minimum`/`maximum`, `description` y
-`examples`: lo que usa el dashboard para sus límites), `derivadas_en_servidor`,
+`entrada` (JSON Schema de cada campo: `title` legible, `minimum`/`maximum`,
+`description`, `examples` y, en los campos codificados, `x-etiquetas` con el significado
+de cada código; con eso, y nada más, el dashboard construye sus formularios),
+`derivadas_en_servidor`,
 `orden_features_modelo`, `prevalencia_base`, `metricas_test` (AUC con IC 95 %
 bootstrap, Brier y su baseline, ECE de 10 bins, matriz de confusión con umbral 0,5),
 `devuelve_clase`, `umbral_clase` y, en B1, `advertencia`. Incluye `max_filas_lote` y

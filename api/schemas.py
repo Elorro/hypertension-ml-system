@@ -44,6 +44,27 @@ def _rango(r: tuple[float, float]) -> str:
     return f"[{r[0]:g}, {r[1]:g}]"
 
 
+# Etiquetas legibles de cada código. Fuente única: generan la description y se
+# publican como ``x-etiquetas`` en el JSON Schema (/v1/modelos, /openapi.json), que es
+# lo que usa el dashboard. Las de gender son inferidas (ver CODIFICACION_GENDER_MANIFIESTO).
+ETIQUETAS: dict[str, dict[int, str]] = {
+    "gender": {1: "mujer (inferido)", 2: "hombre (inferido)"},
+    "cholesterol": {1: "normal", 2: "elevado", 3: "muy elevado"},
+    "gluc": {1: "normal", 2: "elevada", 3: "muy elevada"},
+    "smoke": {0: "no", 1: "sí"},
+    "alco": {0: "no", 1: "sí"},
+    "active": {0: "no", 1: "sí"},
+}
+
+
+def _codigos(campo: str) -> str:
+    return ", ".join(f"{k} = {v}" for k, v in ETIQUETAS[campo].items())
+
+
+def _extra(campo: str) -> dict[str, dict[str, dict[str, str]]]:
+    return {"x-etiquetas": {str(k): v for k, v in ETIQUETAS[campo].items()}}
+
+
 # =======================================================
 # Entrada
 # =======================================================
@@ -53,6 +74,7 @@ class EntradaBase(BaseModel):
     model_config = ConfigDict(extra="forbid", allow_inf_nan=False)
 
     age_years: float = Field(
+        title="Edad (años)",
         ge=AGE_YEARS_RANGE[0],
         le=AGE_YEARS_RANGE[1],
         description=(
@@ -62,20 +84,24 @@ class EntradaBase(BaseModel):
         examples=[52.0],
     )
     gender: Literal[1, 2] = Field(
+        title="Sexo (código)",
         description=(
             "Sexo, código crudo del dataset (1 | 2). Manifiesto, dataset.codificacion_gender: "
             f"«{CODIFICACION_GENDER_MANIFIESTO}». La correspondencia es inferida, no documentada "
             "por la fuente."
         ),
         examples=[1],
+        json_schema_extra=_extra("gender"),
     )
     height: float = Field(
+        title="Talla (cm)",
         ge=HEIGHT_CM_RANGE[0],
         le=HEIGHT_CM_RANGE[1],
         description=f"Talla en cm. Cota de limpieza del entrenamiento {_rango(HEIGHT_CM_RANGE)} cm.",
         examples=[165.0],
     )
     weight: float = Field(
+        title="Peso (kg)",
         ge=WEIGHT_KG_RANGE[0],
         le=WEIGHT_KG_RANGE[1],
         description=(
@@ -85,17 +111,34 @@ class EntradaBase(BaseModel):
         examples=[72.0],
     )
     cholesterol: Literal[1, 2, 3] = Field(
-        description="Colesterol, ordinal del dataset: 1 = normal, 2 = elevado, 3 = muy elevado.",
+        title="Colesterol",
+        description=f"Colesterol, ordinal del dataset: {_codigos('cholesterol')}.",
         examples=[1],
+        json_schema_extra=_extra("cholesterol"),
     )
     gluc: Literal[1, 2, 3] = Field(
-        description="Glucosa, ordinal del dataset: 1 = normal, 2 = elevada, 3 = muy elevada.",
+        title="Glucosa",
+        description=f"Glucosa, ordinal del dataset: {_codigos('gluc')}.",
         examples=[1],
+        json_schema_extra=_extra("gluc"),
     )
-    smoke: Literal[0, 1] = Field(description="Fuma: 0 = no, 1 = sí (autorreportado).", examples=[0])
-    alco: Literal[0, 1] = Field(description="Consume alcohol: 0 = no, 1 = sí (autorreportado).", examples=[0])
+    smoke: Literal[0, 1] = Field(
+        title="Fuma",
+        description=f"Fuma: {_codigos('smoke')} (autorreportado).",
+        examples=[0],
+        json_schema_extra=_extra("smoke"),
+    )
+    alco: Literal[0, 1] = Field(
+        title="Consume alcohol",
+        description=f"Consume alcohol: {_codigos('alco')} (autorreportado).",
+        examples=[0],
+        json_schema_extra=_extra("alco"),
+    )
     active: Literal[0, 1] = Field(
-        description="Físicamente activo: 0 = no, 1 = sí (autorreportado).", examples=[1]
+        title="Físicamente activo",
+        description=f"Físicamente activo: {_codigos('active')} (autorreportado).",
+        examples=[1],
+        json_schema_extra=_extra("active"),
     )
 
     @property
@@ -117,12 +160,14 @@ class EntradaRiesgoCV(EntradaBase):
     """A′: riesgo cardiovascular, con presión arterial."""
 
     ap_hi: float = Field(
+        title="PAS (mmHg)",
         ge=AP_HI_PLAUSIBLE[0],
         le=AP_HI_PLAUSIBLE[1],
         description=f"Presión sistólica (PAS) en mmHg. Rango plausible {_rango(AP_HI_PLAUSIBLE)}.",
         examples=[130.0],
     )
     ap_lo: float = Field(
+        title="PAD (mmHg)",
         ge=AP_LO_PLAUSIBLE[0],
         le=AP_LO_PLAUSIBLE[1],
         description=(

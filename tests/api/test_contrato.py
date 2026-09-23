@@ -115,6 +115,19 @@ def test_gender_cita_el_manifiesto(client, manifiesto):
     assert "inferida" in desc["gender"]["description"]
 
 
+def test_campos_con_titulo_y_etiquetas_por_codigo(client):
+    """El dashboard construye sus formularios solo con esto: nada del dominio a mano."""
+    for m in client.get("/v1/modelos").json()["modelos"]:
+        for nombre, spec in m["entrada"]["campos"].items():
+            assert spec["title"] and spec["title"] != nombre.replace("_", " ").title(), nombre
+            if "enum" in spec:
+                assert sorted(spec["x-etiquetas"]) == sorted(str(v) for v in spec["enum"]), nombre
+                for codigo, etiqueta in spec["x-etiquetas"].items():
+                    assert f"{codigo} = {etiqueta}" in spec["description"] or nombre == "gender"
+            else:
+                assert {"minimum", "maximum", "examples"} <= set(spec), nombre
+
+
 # =======================================================
 # Respuestas individuales
 # =======================================================
