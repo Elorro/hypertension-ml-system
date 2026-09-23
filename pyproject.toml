@@ -1,6 +1,6 @@
 [project]
 name = "hypertension-ml"
-version = "1.0.0"
+version = "2.0.0"
 description = "Sistema end-to-end de clasificación de hipertensión arterial: datos, entrenamiento comparativo, servicio REST y dashboard."
 readme = "README.md"
 requires-python = ">=3.14"
@@ -57,10 +57,12 @@ markers = [
     "requires_data: necesita data/real/cardio/cardio_train.csv (no redistribuible); se salta si falta",
 ]
 filterwarnings = [
-    # Deprecaciones internas de starlette 1.6 en su TestClient (httpx → httpx2 y un
+    # Dos deprecaciones internas del TestClient de starlette 1.6 (httpx → httpx2 y un
     # alias de anyio). No afectan al servicio; no se añade httpx2 solo para callarlas.
-    "ignore:Using `httpx` with `starlette.testclient`:UserWarning",
-    "ignore:The anyio.abc.BlockingPortal alias is deprecated:DeprecationWarning",
+    # Cada filtro exige mensaje + clase exacta + módulo de origen: ningún otro aviso
+    # de deprecación queda silenciado.
+    'ignore:Using `httpx` with `starlette\.testclient`:starlette.exceptions.StarletteDeprecationWarning:fastapi\.testclient$',
+    'ignore:The anyio\.abc\.BlockingPortal alias is deprecated:DeprecationWarning:starlette\.testclient$',
 ]
 
 [tool.mypy]

@@ -58,9 +58,12 @@ jobs:
           test -f models/mejor_modelo.txt
           echo "Modelo seleccionado: $(cat models/mejor_modelo.txt)"
 
-      - name: Verificar que el servicio arranca
+      # El servicio ya no usa estos artefactos sintéticos: sirve models/dt1_*.pkl, que
+      # no están en git. Aquí solo se comprueba que la app se construye sin ellos; la
+      # carga real la cubren los tests de integración (requires_artifacts) en local.
+      - name: Verificar que la API se construye sin artefactos
         run: |
-          python -c "from api.main import app; print('Servicio importado correctamente')"
+          python -c "from api.main import create_app; create_app(cargar_artefactos=False); print('API construida')"
 
   test:
     name: Tests
@@ -77,10 +80,7 @@ jobs:
       - name: Instalar dependencias
         run: pip install -r requirements.lock.txt
 
+      # Sin .pkl ni CSV en CI: corren los tests de contrato; los de integración se
+      # saltan y -rs (pyproject) imprime cada skip con su motivo.
       - name: Ejecutar tests
-        run: |
-          if [ -d tests ]; then
-            pytest -v --cov=src --cov=api --cov-report=term-missing
-          else
-            echo "Sin suite de tests todavía — ver ROADMAP DT-6"
-          fi
+        run: python -m pytest --cov=src --cov=api --cov-report=term-missing

@@ -1,0 +1,11 @@
+# Dependencias MÍNIMAS del dashboard (app/). Versiones == lock.
+#
+#     pip install -r requirements-dashboard.txt
+#     API_URL=http://127.0.0.1:8000 streamlit run app/dashboard.py
+#
+# El dashboard es un cliente HTTP puro de la API: no importa scikit-learn ni
+# carga modelos.
+
+streamlit==1.64.0
+requests==2.34.2          # cliente HTTP de la API
+pandas==2.3.3             # se importa directamente para el lote por CSV

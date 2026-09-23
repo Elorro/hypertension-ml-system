@@ -1,4 +1,4 @@
-.PHONY: help venv install install-dev data train train-real setup api dashboard audit audit-real verify-env test lint format clean
+.PHONY: help venv install install-dev data train train-real setup api dashboard serve-api serve-dashboard audit audit-real verify-env test lint format clean
 
 PYTHON   := python
 # Intérprete base de la corrida de referencia de DT-1 (Python 3.14.6).
@@ -32,13 +32,17 @@ train:  ## Entrena los 5 modelos y selecciona el mejor por macro-F1
 train-real:  ## DT-1: entrena sobre el dataset real de Kaggle (~51 min)
 	$(PYTHON) -m src.train_cardio_real
 
-setup: data train  ## Prepara todo lo necesario para levantar el servicio
+setup: data train  ## Pipeline sintético (evidencia del leakage; ya no alimenta al servicio)
 
-api:  ## Levanta el servicio de inferencia (requiere `make setup`)
-	uvicorn api.main:app --reload --host $(HOST) --port $(PORT)
+serve-api:  ## Levanta la API con los modelos de DT-1 (requiere models/dt1_*.pkl)
+	uvicorn api.main:app --host $(HOST) --port $(PORT)
 
-dashboard:  ## Levanta el dashboard Streamlit (requiere `make api` corriendo)
-	streamlit run app/dashboard.py
+serve-dashboard:  ## Levanta el dashboard (cliente de la API; API_URL, por defecto :8000)
+	API_URL=$${API_URL:-http://$(HOST):$(PORT)} streamlit run app/dashboard.py
+
+api: serve-api  ## Alias de serve-api
+
+dashboard: serve-dashboard  ## Alias de serve-dashboard
 
 audit:  ## Auditoría de target leakage del dataset sintético
 	$(PYTHON) scripts/verify_leakage.py

@@ -1,0 +1,30 @@
+# Dependencias MÍNIMAS del servicio de inferencia (api/). Versiones == lock.
+#
+#     pip install -r requirements-serve.txt
+#     uvicorn api.main:app --host 0.0.0.0 --port 8000
+#
+# La API verifica al arrancar (perfil «servicio» de src/artefactos.py) que
+# scikit-learn, numpy y joblib coinciden EXACTAMENTE con la corrida de DT-1;
+# si no, no arranca. Cambiar esas tres versiones exige reentrenar.
+#
+# Fuera a propósito:
+#   pandas   — los modelos se ajustaron con ndarray (sin feature_names_in_);
+#              sklearn lo importa solo como opcional.
+#   xgboost  — ningún ganador servido (A′, B1) es XGBoost. Si un reentreno
+#              eligiera XGBoost, la API no arrancaría hasta añadirlo.
+#   uvicorn[standard] — uvloop/httptools/watchfiles/websockets no aportan
+#              nada a un servicio sin recarga ni websockets.
+
+# --- Servicio ---
+fastapi==0.141.1
+pydantic==2.13.5          # se importa directamente en api/schemas.py
+uvicorn==0.53.0
+
+# --- Deserializar y predecir (exactas: compatibilidad del pickle) ---
+scikit-learn==1.9.1
+numpy==2.5.3
+joblib==1.6.0
+
+# --- Dependencias obligatorias de scikit-learn, fijadas como en el lock ---
+scipy==1.18.1
+threadpoolctl==3.7.0
