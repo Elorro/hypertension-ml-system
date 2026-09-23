@@ -22,9 +22,11 @@ jobs:
       - name: Instalar ruff (versión del lock)
         run: pip install "$(grep -E '^ruff==' requirements.lock.txt)"
 
-      - name: Verificar estilo
+      - name: Lint (ruff check)
         run: ruff check .
-        continue-on-error: true   # el código heredado aún no cumple; ver ROADMAP DT-5
+
+      - name: Formato (ruff format --check)
+        run: ruff format --check .
 
   pipeline:
     name: Pipeline end-to-end
