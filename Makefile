@@ -1,17 +1,26 @@
-.PHONY: help install install-dev data train train-real setup api dashboard audit audit-real test lint format clean
+.PHONY: help venv install install-dev data train train-real setup api dashboard audit audit-real verify-env test lint format clean
 
-PYTHON := python
-HOST   := 127.0.0.1
-PORT   := 8000
+PYTHON   := python
+# Intérprete base de la corrida de referencia de DT-1 (Python 3.14.6).
+PYBASE   := /usr/bin/python3.14
+HOST     := 127.0.0.1
+PORT     := 8000
 
 help:  ## Muestra esta ayuda
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) \
 		| awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-14s\033[0m %s\n", $$1, $$2}'
 
-install:  ## Instala dependencias de ejecución
-	$(PYTHON) -m pip install -r requirements.txt
+venv:  ## Crea .venv desde cero con el Python de referencia e instala el lock
+	rm -rf .venv
+	$(PYBASE) -m venv .venv
+	.venv/bin/python -m pip install --upgrade pip setuptools wheel
+	.venv/bin/python -m pip install -r requirements.lock.txt
+	.venv/bin/python scripts/verify_env.py
 
-install-dev:  ## Instala dependencias de ejecución y desarrollo
+install:  ## Instala el entorno exacto (lock) en el venv activo
+	$(PYTHON) -m pip install -r requirements.lock.txt
+
+install-dev:  ## Instala desde los rangos declarados (para regenerar el lock)
 	$(PYTHON) -m pip install -r requirements.txt -r requirements-dev.txt
 
 data:  ## Genera el dataset sintético (50k filas, seed=42)
@@ -36,6 +45,9 @@ audit:  ## Auditoría de target leakage del dataset sintético
 
 audit-real:  ## Criterio de aceptación de DT-1 sobre el dataset real
 	$(PYTHON) scripts/audit_cardio_leakage.py
+
+verify-env:  ## Compuerta del entorno: versiones + sha256 + carga y predicción de los .pkl de DT-1
+	$(PYTHON) scripts/verify_env.py
 
 test:  ## Ejecuta la suite de tests
 	pytest -v --cov=src --cov=api --cov-report=term-missing

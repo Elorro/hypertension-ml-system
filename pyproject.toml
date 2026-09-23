@@ -3,7 +3,7 @@ name = "hypertension-ml"
 version = "1.0.0"
 description = "Sistema end-to-end de clasificación de hipertensión arterial: datos, entrenamiento comparativo, servicio REST y dashboard."
 readme = "README.md"
-requires-python = ">=3.12"
+requires-python = ">=3.14"
 license = { file = "LICENSE" }
 authors = [{ name = "Luis Araque", email = "luisalfredoaraque@gmail.com" }]
 keywords = ["machine-learning", "hipertension", "fastapi", "streamlit", "mlops"]
@@ -11,13 +11,13 @@ classifiers = [
     "Development Status :: 3 - Alpha",
     "Intended Audience :: Education",
     "License :: OSI Approved :: MIT License",
-    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.14",
     "Topic :: Scientific/Engineering :: Artificial Intelligence",
 ]
 
 [tool.ruff]
 line-length = 110
-target-version = "py312"
+target-version = "py314"
 exclude = [".venv", "notebooks", "data", "models"]
 
 [tool.ruff.lint]
@@ -52,7 +52,7 @@ python_files = ["test_*.py"]
 addopts = "-v --strict-markers"
 
 [tool.mypy]
-python_version = "3.12"
+python_version = "3.14"
 warn_return_any = true
 warn_unused_configs = true
 ignore_missing_imports = true
