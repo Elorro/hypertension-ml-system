@@ -15,7 +15,7 @@ venv:  ## Crea .venv desde cero con el Python de referencia e instala el lock
 	$(PYBASE) -m venv .venv
 	.venv/bin/python -m pip install --upgrade pip setuptools wheel
 	.venv/bin/python -m pip install -r requirements.lock.txt
-	.venv/bin/python scripts/verify_env.py
+	.venv/bin/python -m scripts.verify_env
 
 install:  ## Instala el entorno exacto (lock) en el venv activo
 	$(PYTHON) -m pip install -r requirements.lock.txt
@@ -30,7 +30,7 @@ train:  ## Entrena los 5 modelos y selecciona el mejor por macro-F1
 	$(PYTHON) src/train_classical_models.py
 
 train-real:  ## DT-1: entrena sobre el dataset real de Kaggle (~51 min)
-	$(PYTHON) src/train_cardio_real.py
+	$(PYTHON) -m src.train_cardio_real
 
 setup: data train  ## Prepara todo lo necesario para levantar el servicio
 
@@ -47,10 +47,10 @@ audit-real:  ## Criterio de aceptación de DT-1 sobre el dataset real
 	$(PYTHON) scripts/audit_cardio_leakage.py
 
 verify-env:  ## Compuerta del entorno: versiones + sha256 + carga y predicción de los .pkl de DT-1
-	$(PYTHON) scripts/verify_env.py
+	$(PYTHON) -m scripts.verify_env
 
-test:  ## Ejecuta la suite de tests
-	pytest -v --cov=src --cov=api --cov-report=term-missing
+test:  ## Ejecuta la suite; los tests que necesitan .pkl o el CSV real se saltan con motivo visible
+	$(PYTHON) -m pytest --cov=src --cov=api --cov-report=term-missing
 
 lint:  ## Verifica estilo y tipos
 	ruff check .

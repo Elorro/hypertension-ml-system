@@ -49,7 +49,19 @@ indent-style = "space"
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 python_files = ["test_*.py"]
-addopts = "-v --strict-markers"
+pythonpath = ["."]
+# -rs: el motivo de cada skip (artefactos o CSV ausentes) queda visible en la salida.
+addopts = "-v -rs --strict-markers"
+markers = [
+    "requires_artifacts: necesita models/dt1_*.pkl (no versionados); se salta si faltan",
+    "requires_data: necesita data/real/cardio/cardio_train.csv (no redistribuible); se salta si falta",
+]
+filterwarnings = [
+    # Deprecaciones internas de starlette 1.6 en su TestClient (httpx → httpx2 y un
+    # alias de anyio). No afectan al servicio; no se añade httpx2 solo para callarlas.
+    "ignore:Using `httpx` with `starlette.testclient`:UserWarning",
+    "ignore:The anyio.abc.BlockingPortal alias is deprecated:DeprecationWarning",
+]
 
 [tool.mypy]
 python_version = "3.14"

@@ -11,7 +11,7 @@
 # `entorno` en models/dt1_manifest.json. Cambiar cualquiera de ellas exige
 # reentrenar DT-1 y regenerar el manifiesto, no editar este archivo.
 #
-# Compuerta: tras cualquier cambio aquí, `python scripts/verify_env.py`.
+# Compuerta: tras cualquier cambio aquí, `python -m scripts.verify_env`.
 
 # --- Datos y cómputo numérico (pinneado: compatibilidad de .pkl) ---
 numpy==2.5.3
@@ -23,7 +23,8 @@ xgboost==3.4.1
 
 # joblib es el (de)serializador. El manifiesto de DT-1 NO registra su
 # versión —hueco a cerrar en src/train_cardio_real.py—, así que aquí va
-# rango y el lock fija la versión efectiva.
+# rango y el lock fija la versión efectiva. La API y verify_env la exigen
+# exacta contra src/artefactos.py::JOBLIB_REFERENCIA (tomada del lock).
 joblib>=1.4,<2.0
 
 # --- Visualización ---

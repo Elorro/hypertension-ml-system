@@ -20,9 +20,11 @@ Decisiones de diseño no negociables (ver BITACORA.md):
 * Ningún ``.pkl`` del pipeline sintético se sobrescribe: todo artefacto lleva el
   prefijo ``dt1_``.
 
-Uso::
+Features, derivaciones y cotas vienen de ``src/cardio_features.py``.
 
-    python src/train_cardio_real.py
+Uso (desde la raíz del repositorio)::
+
+    python -m src.train_cardio_real
 """
 
 from __future__ import annotations
@@ -60,6 +62,22 @@ from sklearn.svm import SVC
 from sklearn.tree import DecisionTreeClassifier
 from xgboost import XGBClassifier
 
+from src.cardio_features import (
+    AP_HI_PLAUSIBLE,
+    AP_LO_PLAUSIBLE,
+    BMI_RANGE,
+    FEATURE_LINEAGE,
+    FEATURES_A_CON_PA,
+    FEATURES_A_SIN_PA,
+    FEATURES_B1,
+    FORBIDDEN_B1,
+    HEIGHT_CM_RANGE,
+    WEIGHT_KG_RANGE,
+    age_years_from_days,
+    bmi,
+    en_rango,
+)
+
 # =======================================================
 # Configuración
 # =======================================================
@@ -73,56 +91,8 @@ DATA_PATH = ROOT / "data/real/cardio/cardio_train.csv"
 MODELS_DIR = ROOT / "models"
 MANIFEST_PATH = MODELS_DIR / "dt1_manifest.json"
 
-# Cortes antropométricos. Criterio: imposibilidad fisiológica en adultos de 30-65
-# años, no recorte de outliers. Documentados también en el manifiesto.
-HEIGHT_CM_RANGE: tuple[float, float] = (120.0, 220.0)
-WEIGHT_KG_RANGE: tuple[float, float] = (30.0, 200.0)
-BMI_RANGE: tuple[float, float] = (12.0, 70.0)
-
-# Rangos de presión plausibles. NO se usan para limpiar (fuera del alcance acordado);
-# solo para el análisis de sensibilidad sobre test.
-AP_HI_PLAUSIBLE: tuple[float, float] = (70.0, 250.0)
-AP_LO_PLAUSIBLE: tuple[float, float] = (40.0, 200.0)
-
 HTA_SBP_THRESHOLD: int = 140
 HTA_DBP_THRESHOLD: int = 90
-
-PRESSURE_COLUMNS: frozenset[str] = frozenset({"ap_hi", "ap_lo"})
-FORBIDDEN_B1: frozenset[str] = PRESSURE_COLUMNS | {"cardio", "id", "hta", "hta_gt"}
-
-# Orden de features: contrato con el manifiesto y, más adelante, con la API.
-FEATURES_BASE: list[str] = [
-    "age_years",
-    "gender",
-    "height",
-    "weight",
-    "bmi",
-    "cholesterol",
-    "gluc",
-    "smoke",
-    "alco",
-    "active",
-]
-FEATURES_A_CON_PA: list[str] = FEATURES_BASE + ["ap_hi", "ap_lo"]
-FEATURES_A_SIN_PA: list[str] = list(FEATURES_BASE)
-FEATURES_B1: list[str] = list(FEATURES_BASE)
-
-# Linaje de cada feature: columnas crudas de las que se calcula. Es lo que permite
-# verificar estructuralmente que ninguna feature de B1 deriva de la presión.
-FEATURE_LINEAGE: dict[str, set[str]] = {
-    "age_years": {"age"},
-    "gender": {"gender"},
-    "height": {"height"},
-    "weight": {"weight"},
-    "bmi": {"weight", "height"},
-    "cholesterol": {"cholesterol"},
-    "gluc": {"gluc"},
-    "smoke": {"smoke"},
-    "alco": {"alco"},
-    "active": {"active"},
-    "ap_hi": {"ap_hi"},
-    "ap_lo": {"ap_lo"},
-}
 
 
 # =======================================================
@@ -165,11 +135,10 @@ def load_and_clean() -> tuple[pd.DataFrame, dict[str, Any]]:
     step("presion_invertida", "ap_lo >= ap_hi -> descartar (no se intercambian columnas)", before, df)
 
     before = df
-    bmi = df["weight"] / (df["height"] / 100.0) ** 2
     mask = (
-        df["height"].between(*HEIGHT_CM_RANGE)
-        & df["weight"].between(*WEIGHT_KG_RANGE)
-        & bmi.between(*BMI_RANGE)
+        en_rango(df["height"], HEIGHT_CM_RANGE)
+        & en_rango(df["weight"], WEIGHT_KG_RANGE)
+        & en_rango(bmi(df["weight"], df["height"]), BMI_RANGE)
     )
     df = df[mask]
     step(
@@ -181,11 +150,11 @@ def load_and_clean() -> tuple[pd.DataFrame, dict[str, Any]]:
     )
 
     df = df.copy()
-    df["age_years"] = df["age"] / 365.25
-    df["bmi"] = df["weight"] / (df["height"] / 100.0) ** 2
+    df["age_years"] = age_years_from_days(df["age"])
+    df["bmi"] = bmi(df["weight"], df["height"])
     df["hta"] = ((df["ap_hi"] >= HTA_SBP_THRESHOLD) | (df["ap_lo"] >= HTA_DBP_THRESHOLD)).astype(int)
     df["hta_gt"] = ((df["ap_hi"] > HTA_SBP_THRESHOLD) | (df["ap_lo"] > HTA_DBP_THRESHOLD)).astype(int)
-    df["pa_plausible"] = df["ap_hi"].between(*AP_HI_PLAUSIBLE) & df["ap_lo"].between(*AP_LO_PLAUSIBLE)
+    df["pa_plausible"] = en_rango(df["ap_hi"], AP_HI_PLAUSIBLE) & en_rango(df["ap_lo"], AP_LO_PLAUSIBLE)
 
     report["filas_finales"] = len(df)
     report["fraccion_conservada"] = len(df) / len(raw)

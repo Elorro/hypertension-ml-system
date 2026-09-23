@@ -53,10 +53,11 @@ ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_CSV = ROOT / "data/real/cardio/cardio_train.csv"
 DEFAULT_MANIFEST = ROOT / "models/dt1_manifest.json"
 
-# Mismos parámetros que src/train_cardio_real.py. Duplicados a propósito: la
-# auditoría no importa el módulo de entrenamiento (arrastraría sklearn/xgboost) y
-# así la limpieza queda reimplementada de forma independiente. La coincidencia con
-# el manifiesto se verifica al final.
+# Mismos parámetros que src/cardio_features.py (fuente única del entrenamiento y la
+# API). Duplicados a propósito: la auditoría no importa ni ese módulo ni el de
+# entrenamiento, para que la limpieza quede reimplementada de forma independiente y
+# un error allí no se herede aquí. La coincidencia con el manifiesto se verifica al
+# final.
 SEED = 42
 TEST_SIZE = 0.20
 HEIGHT_CM_RANGE = (120.0, 220.0)

@@ -2,8 +2,10 @@
 
 Criterio de éxito del entorno reproducible. Comprueba, en este orden:
 
-1. Las versiones instaladas coinciden con `entorno` del manifiesto de DT-1.
-   Un .pkl de scikit-learn cargado con otra versión puede fallar en silencio.
+1. Las versiones instaladas coinciden con `entorno` del manifiesto de DT-1
+   (perfil «entorno» de src/artefactos.py: Python por major.minor; sklearn,
+   numpy, pandas, joblib y xgboost exactos). Un .pkl de scikit-learn cargado
+   con otra versión puede fallar en silencio.
 2. El sha256 de cada artefacto coincide con el registrado en el manifiesto.
 3. Cada modelo y su scaler cargan sin excepción ni UserWarning de versión.
 4. Control de identidad: `mean_` y `scale_` del scaler cargado reproducen los
@@ -12,8 +14,10 @@ Criterio de éxito del entorno reproducible. Comprueba, en este orden:
 5. Predicción de prueba sobre dos perfiles y control de monotonía: el perfil
    de riesgo alto debe recibir probabilidad mayor que el de riesgo bajo.
 
-Uso:
-    python scripts/verify_env.py
+Los pasos 1-4 son los mismos que ejecuta la API al arrancar (src/artefactos.py).
+
+Uso (desde la raíz del repositorio):
+    python -m scripts.verify_env
 
 Salida: código 0 si todo pasa, 1 en el primer fallo.
 
@@ -23,18 +27,18 @@ herramienta clínica. Ninguna salida aquí es un diagnóstico médico.
 
 from __future__ import annotations
 
-import hashlib
 import json
 import sys
-import warnings
 from pathlib import Path
 
-import joblib
 import numpy as np
 
+from src.artefactos import ArtefactoInvalido, cargar_experimento, comparar_versiones, experimentos
+from src.cardio_features import bmi
+
 ROOT = Path(__file__).resolve().parents[1]
-MANIFEST_PATH = ROOT / "models" / "dt1_manifest.json"
-TOL = 1e-9
+MODEL_DIR = ROOT / "models"
+MANIFEST_PATH = MODEL_DIR / "dt1_manifest.json"
 
 # Perfiles de prueba en el orden de features de cada experimento. Valores
 # plausibles, no reales: sirven para ejercitar el grafo de inferencia.
@@ -44,7 +48,7 @@ PERFILES: dict[str, dict[str, float]] = {
         "gender": 1.0,
         "height": 170.0,
         "weight": 65.0,
-        "bmi": 65.0 / (1.70**2),
+        "bmi": bmi(65.0, 170.0),
         "cholesterol": 1.0,
         "gluc": 1.0,
         "smoke": 0.0,
@@ -58,7 +62,7 @@ PERFILES: dict[str, dict[str, float]] = {
         "gender": 2.0,
         "height": 168.0,
         "weight": 95.0,
-        "bmi": 95.0 / (1.68**2),
+        "bmi": bmi(95.0, 168.0),
         "cholesterol": 3.0,
         "gluc": 3.0,
         "smoke": 1.0,
@@ -70,104 +74,40 @@ PERFILES: dict[str, dict[str, float]] = {
 }
 
 
-def sha256_file(path: Path) -> str:
-    h = hashlib.sha256()
-    with path.open("rb") as fh:
-        for chunk in iter(lambda: fh.read(1 << 20), b""):
-            h.update(chunk)
-    return h.hexdigest()
-
-
 def fallo(mensaje: str) -> None:
     print(f"  ✗ {mensaje}")
     sys.exit(1)
 
 
-def experimentos(manifiesto: dict) -> list[dict]:
-    """Recorre el manifiesto y devuelve cada bloque con artefactos."""
-    encontrados: list[dict] = []
-
-    def recorrer(nodo: object) -> None:
-        if isinstance(nodo, dict):
-            if "artefactos" in nodo and "features_orden" in nodo:
-                encontrados.append(nodo)
-            for valor in nodo.values():
-                recorrer(valor)
-
-    recorrer(manifiesto["experimentos"])
-    return encontrados
-
-
-def verificar_versiones(esperado: dict[str, str]) -> None:
-    import importlib.metadata as md
-
-    print("1. Versiones contra el manifiesto de la corrida de referencia")
-    print(f"  {'paquete':16s} {'manifiesto':12s} {'instalado':12s}")
-
-    actual = {
-        "python": ".".join(str(n) for n in sys.version_info[:3]),
-        "scikit_learn": md.version("scikit-learn"),
-        "xgboost": md.version("xgboost"),
-        "pandas": md.version("pandas"),
-        "numpy": md.version("numpy"),
-    }
-
-    desviaciones = []
-    for paquete, version_ref in esperado.items():
-        version_act = actual.get(paquete, "AUSENTE")
-        marca = "✓" if version_act == version_ref else "✗"
-        print(f"  {marca} {paquete:14s} {version_ref:12s} {version_act:12s}")
-        if version_act != version_ref:
-            desviaciones.append(paquete)
-
+def verificar_versiones(manifiesto: dict, ganadores: list[str]) -> None:
+    print("1. Versiones contra el manifiesto de la corrida de referencia (perfil entorno)")
+    print(f"  {'paquete':16s} {'esperado':12s} {'instalado':12s}")
+    filas = comparar_versiones(manifiesto, "entorno", ganadores)
+    for f in filas:
+        print(f"  {'✓' if f.ok else '✗'} {f.paquete:14s} {f.esperado:12s} {f.instalado:12s}")
+    desviaciones = [f.paquete for f in filas if not f.ok]
     if desviaciones:
         fallo(f"versiones distintas a la corrida de referencia: {', '.join(desviaciones)}")
-    print("  → coinciden todas\n")
+    print("  → coinciden todas (python por major.minor)\n")
 
 
 def verificar_experimento(exp: dict) -> None:
-    nombre = exp["nombre"]
     features = exp["features_orden"]
-    print(f"[{nombre}]  target={exp['target']}  ganador={exp['ganador']}  n_features={len(features)}")
+    print(f"[{exp['nombre']}]  target={exp['target']}  ganador={exp['ganador']}  n_features={len(features)}")
 
-    # --- sha256 de los artefactos ---
-    rutas = {}
-    for clave in ("modelo", "scaler"):
-        ruta = ROOT / exp["artefactos"][clave]["ruta"]
-        if not ruta.exists():
-            fallo(f"falta {ruta.relative_to(ROOT)}")
-        digest = sha256_file(ruta)
-        if digest != exp["artefactos"][clave]["sha256"]:
-            fallo(f"sha256 distinto en {ruta.relative_to(ROOT)}: {digest[:16]}… != manifiesto")
-        rutas[clave] = ruta
+    try:
+        cargado = cargar_experimento(exp, MODEL_DIR)
+    except ArtefactoInvalido as exc:
+        fallo(str(exc))
     print("  ✓ sha256 de modelo y scaler coinciden con el manifiesto")
-
-    # --- carga, tratando cualquier UserWarning de versión como fallo ---
-    with warnings.catch_warnings():
-        warnings.simplefilter("error", UserWarning)
-        try:
-            modelo = joblib.load(rutas["modelo"])
-            scaler = joblib.load(rutas["scaler"])
-        except Exception as exc:  # noqa: BLE001 - el mensaje exacto es el diagnóstico
-            fallo(f"carga fallida: {type(exc).__name__}: {exc}")
-    print(f"  ✓ cargan sin warnings — {type(modelo).__name__} + {type(scaler).__name__}")
-
-    # --- control de identidad del scaler ---
-    ref = exp["scaler"]
-    for atributo in ("mean_", "scale_"):
-        delta = float(np.max(np.abs(getattr(scaler, atributo) - np.asarray(ref[atributo]))))
-        if delta > TOL:
-            fallo(f"{atributo} del scaler se desvía del manifiesto (máx |Δ| = {delta:.3e})")
+    print(f"  ✓ cargan sin warnings — {type(cargado.modelo).__name__} + {type(cargado.scaler).__name__}")
     print("  ✓ control de identidad: mean_ y scale_ reproducen el manifiesto")
-
-    if scaler.n_features_in_ != len(features):
-        fallo(f"el scaler espera {scaler.n_features_in_} features, el manifiesto declara {len(features)}")
 
     # --- predicción de prueba ---
     X = np.array([[PERFILES[p][f] for f in features] for p in ("riesgo_bajo", "riesgo_alto")], dtype=float)
-    Xs = scaler.transform(X)
-    pred = modelo.predict(Xs)
-    proba = modelo.predict_proba(Xs)[:, 1]
+    Xs = cargado.scaler.transform(X)
+    pred = cargado.modelo.predict(Xs)
+    proba = cargado.modelo.predict_proba(Xs)[:, 1]
 
     for etiqueta, clase, p in zip(("riesgo_bajo", "riesgo_alto"), pred, proba, strict=True):
         print(f"    {etiqueta:12s} → clase {int(clase)}   P(positivo) = {p:.4f}")
@@ -187,12 +127,12 @@ def main() -> None:
     print("VERIFICACIÓN DEL ENTORNO — artefactos de DT-1")
     print("=" * 78 + "\n")
 
-    verificar_versiones(manifiesto["entorno"])
-
-    print("2. Carga y predicción por experimento\n")
-    bloques = experimentos(manifiesto)
+    bloques = list(experimentos(manifiesto).values())
     if not bloques:
         fallo("el manifiesto no declara ningún experimento con artefactos")
+    verificar_versiones(manifiesto, [b["ganador"] for b in bloques])
+
+    print("2. Carga y predicción por experimento\n")
     for exp in bloques:
         verificar_experimento(exp)
 
