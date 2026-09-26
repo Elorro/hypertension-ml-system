@@ -1,4 +1,4 @@
-.PHONY: help venv install install-dev data train train-real setup api dashboard serve-api serve-dashboard audit audit-real verify-env test lint format clean
+.PHONY: help venv install install-dev data train train-real train-dt4 setup api dashboard serve-api serve-dashboard audit audit-real verify-env test lint format clean
 
 PYTHON   := python
 # Intérprete base de la corrida de referencia de DT-1 (Python 3.14.6).
@@ -31,6 +31,11 @@ train:  ## Entrena los 5 modelos y selecciona el mejor por macro-F1
 
 train-real:  ## DT-1: entrena sobre el dataset real de Kaggle (~51 min)
 	$(PYTHON) -m src.train_cardio_real
+
+train-dt4:  ## DT-4: CV + 1 EE + una evaluación en test, en segundo plano (log en logs/dt4_run.log)
+	mkdir -p logs
+	nohup $(PYTHON) -m src.train_cardio_dt4 > logs/dt4_run.log 2>&1 &
+	@echo "DT-4 lanzado en segundo plano: tail -f logs/dt4_run.log"
 
 setup: data train  ## Pipeline sintético (evidencia del leakage; ya no alimenta al servicio)
 
