@@ -43,6 +43,15 @@ y el versionado sigue [SemVer](https://semver.org/lang/es/).
   con motivo visible si faltan.
 - `requirements-serve.txt` y `requirements-dashboard.txt` (instalaciones mínimas);
   objetivos `make serve-api` y `make serve-dashboard`.
+- **DT-4 · Protocolo preregistrado** (`0d8d4c9`, `docs/DT4_PROTOCOL.md`), commiteado
+  antes de entrenar: selección por log-loss en validación cruzada de 5 folds sobre el
+  train, regla de 1 EE con orden de simplicidad, una evaluación en test por experimento
+  y dos ablaciones de A′ preregistradas.
+- **`src/train_cardio_dt4.py`** (`ad518f2`) y objetivo `make train-dt4`; manifiesto de la
+  corrida `models/dt4_manifest.json` (`41572ed`), con resultados por fold, regla
+  aplicada, `pip freeze` y joblib. Resultados en `docs/DT4_RESULTS.md`.
+- `make verify-env-dt1` y `python -m scripts.verify_env --manifest …` (`a7bf9ef`).
+- `/v1/modelos` informa cómo se seleccionó cada modelo (`seleccion`) (`a7bf9ef`).
 
 ### Cambiado
 
@@ -51,6 +60,12 @@ y el versionado sigue [SemVer](https://semver.org/lang/es/).
 - `python -m src.train_cardio_real` y `python -m scripts.verify_env` sustituyen a la
   ejecución directa de esos archivos.
 - Python 3.14 como versión de referencia (`f508c85`).
+- **Modelos servidos: los de DT-4** (`a7bf9ef`): A′ RandomForest(max_depth=12,
+  min_samples_leaf=20) y B1 RandomForest(max_depth=8, min_samples_leaf=100). La API y
+  `verify_env` usan `models/dt4_manifest.json` por defecto; el de DT-1 queda como
+  registro. RSS de la API 352 → 202 MiB; `.pkl` servidos 130 → 32 MB.
+- La nota de métricas y la advertencia de B1 servidas ya no hablan de «ganador» elegido
+  sobre el test; el dashboard muestra el AUC de B1 con tres decimales (`a7bf9ef`).
 - Todo el repositorio formateado con `ruff format` sin cambio de comportamiento
   (`0e75317`); el job de lint de CI pasa a ser bloqueante (`d6d1b0f`).
 - El dataset de Kaggle deja de redistribuirse: estuvo versionado, se detectó que su
@@ -74,16 +89,20 @@ y el versionado sigue [SemVer](https://semver.org/lang/es/).
   lugar de `SVC(probability=True)`, deprecado (DT-17 parcial).
 - **DT-7 · Validación de rangos** y **DT-9 · Endpoint batch**, en la API nueva
   (`6e59035`). **DT-11 · Versiones fijadas** (`f508c85`).
+- **DT-3 · Validación cruzada** y **DT-4 · Selección separada de la evaluación**
+  (`0d8d4c9`, `ad518f2`, `41572ed`, `a7bf9ef`). Limitación declarada: el test ya se
+  había observado en DT-1.
+- La ablación de A′ de DT-1 (Δ AUC 0,1103) estaba inflada por comparar contra una SVM
+  elegida por macro-F1; la ablación controlada de DT-4 da 0,0991 [0,0919 · 0,1061].
 - Documentación: la regla `if` deja de describirse con un conteo de líneas que no
   cuadraba con ningún bloque real, y el 91,1 % del dataset sintético se distingue de
   la auditoría sobre datos reales (`c3814b2`).
 
 ### Por hacer
 
-Ver [docs/ROADMAP.md](docs/ROADMAP.md). Prioridad inmediata: **DT-4** — separar
-selección de evaluación con un split en tres. Las métricas publicadas siguen
-sesgadas al alza mientras el test elija y evalúe al mismo tiempo. Después, la parte
-pendiente de DT-5: decidir si el pipeline heredado de la raíz se migra o se elimina.
+Ver [docs/ROADMAP.md](docs/ROADMAP.md). Pendientes: la parte de DT-5 que falta
+(decidir si el pipeline heredado de la raíz se migra o se elimina), la cobertura de
+DT-6 en CI, el análisis de equidad (DT-15) y la decisión de despliegue.
 
 ---
 

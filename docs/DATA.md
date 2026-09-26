@@ -131,7 +131,8 @@ Es el camino de salida del problema de leakage, y DT-1 lo tomó. Definiendo la
 etiqueta de hipertensión desde `ap_hi`/`ap_lo` y **excluyendo esas dos columnas de las
 features**, el problema pasa a ser genuinamente predictivo: estimar estado
 hipertensivo sin medir la presión, a partir de edad, IMC, colesterol, glucosa y
-hábitos (experimento B1: AUC 0,6941). Ver [DT1_RESULTS.md](DT1_RESULTS.md).
+hábitos (experimento B1: AUC 0,6955 en DT-4; 0,6941 en DT-1). Ver
+[DT4_RESULTS.md](DT4_RESULTS.md).
 
 ---
 

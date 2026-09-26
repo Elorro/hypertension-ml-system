@@ -8,6 +8,105 @@ Formato: entradas descendentes (lo más reciente arriba).
 
 ---
 
+## 2026-09-26 — DT-3 y DT-4 cerrados: selección preregistrada por validación cruzada
+
+**Fase:** 2 (validación matemática) — **compuerta superada**; el servicio pasa a DT-4
+
+### Qué se cerró
+
+El ganador de cada experimento ya no se elige sobre el test que reporta sus métricas.
+Selección por log-loss media en validación cruzada de 5 folds **sobre el train**, con la
+regla de un error estándar y un orden de simplicidad declarado; el test se evaluó una
+sola vez por experimento, sobre el seleccionado.
+
+**Preregistro.** El protocolo se commiteó antes de escribir el código y antes de
+entrenar: `docs/DT4_PROTOCOL.md`, commit `0d8d4c9`, sha256 `6a2c70b2…978412ce`. Antes de
+commitearlo se le añadieron, por decisión de Luis, el escalado explícito dentro de cada
+fold y la ablación en dos medidas (principal controlada y secundaria práctica).
+
+Commits, en orden:
+
+- **`0d8d4c9`** — protocolo preregistrado.
+- **`ad518f2`** — `src/train_cardio_dt4.py` y `tests/test_dt4.py`: CV con
+  `Pipeline(StandardScaler, modelo)` por fold, regla de 1 EE, `evaluar_en_test` que solo
+  acepta el modelo seleccionado, verificación de que la partición es la de DT-1.
+- **`41572ed`** — `models/dt4_manifest.json`, el registro de la corrida.
+- **`a7bf9ef`** — la API y `verify_env` sirven DT-4 por defecto; `make verify-env-dt1`
+  para el registro de DT-1; textos servidos corregidos.
+- El commit de documentación que añade esta entrada: `docs/DT4_RESULTS.md` y los
+  documentos vivos.
+
+### Resultados
+
+Corrida del 2026-09-25: 412 s, código `ad518f2` con árbol limpio, sin desviaciones, sin
+candidatos excluidos ni avisos; los `dt1_*` no cambiaron (sha256 idénticos).
+
+- **Seleccionados:** A′ con PA RandomForest(max_depth=12, min_samples_leaf=20); A′ sin
+  PA RandomForest(8, 20); B1 RandomForest(8, 100). En los tres, el mínimo de log-loss
+  era un XGBoost poco profundo, con el RF dentro de 1 EE y antes en el orden.
+- **A′ con PA en test:** AUC 0,8019 [0,7938 · 0,8088], log-loss 0,5414, Brier 0,1807;
+  **ECE 0,0141 frente a 0,0118 en DT-1** (no hay IC del ECE).
+- **B1 en test:** AUC 0,6955 [0,6866 · 0,7049], log-loss 0,5889, Brier 0,2015, ECE
+  0,0079. La mejora frente a DT-1 no está en el AUC (0,6941 → 0,6955, dentro del ruido)
+  sino en el sobreajuste (brecha train/test 0,109 → 0,014) y el tamaño (70 → 5,5 MB).
+- **Ablación de A′, vigente:** principal controlada Δ AUC = 0,0991 [0,0919 · 0,1061];
+  secundaria práctica 0,0994. El 0,1103 de DT-1 estaba inflado: comparaba contra una SVM
+  elegida por macro-F1. La controlada coincide con el Δ del propio RF en DT-1 (0,1004).
+- **Regresión logística:** fuera de 1 EE en log-loss en los tres experimentos (B1:
+  0,59190 frente a un umbral de 0,58895). «Una regresión logística alcanza el techo»
+  era cierto en AUC, no en log-loss.
+- **Servicio:** RSS de la API 352 → 202 MiB; `.pkl` servidos 130 → 32 MB. Tiempo de la
+  corrida 412 s frente a los 12-15 min estimados en la Fase 0 (la estimación usaba el
+  peor tiempo de DT-1 para todas las configuraciones).
+
+### Predicciones que no se cumplieron
+
+- **La de Luis:** que en B1 se seleccionaría la regresión logística. No: queda fuera de
+  1 EE en log-loss.
+- **La del protocolo (§11):** que DT-4 no superaría a DT-1, porque las cifras de DT-1
+  estaban sesgadas al alza. No se cumplió literalmente: en A′ con PA y en B1, DT-4 queda
+  igual o marginalmente por encima (AUC +0,0002 y +0,0014, dentro del IC). Se registra
+  tal cual, sin reinterpretar el protocolo. Lectura: el sesgo por selección de DT-1 era
+  pequeño porque los candidatos empataban.
+
+### Verificación
+
+- Tests de `ad518f2` verificados por mutación: fallan si la CV lee todas las filas, si
+  una evaluación en test se hace dos veces o si el scaler de la CV ve todo el train.
+- Antes del commit `ad518f2` se detectó que la implementación verificaba la partición
+  por medias del scaler y no «contra los hashes congelados» como exige el protocolo §2;
+  se corrigió en el código antes de correr, así que no hay desviación. También se
+  corrigió `pip_freeze()`, que contaba cada paquete dos veces (`.venv/lib64` → `lib`).
+- Tras la corrida: la regla de 1 EE reaplicada sobre los resultados guardados reproduce
+  los seleccionados, y el sha256 del protocolo sigue siendo el registrado (tests en CI).
+- `make verify-env` (DT-4) y `make verify-env-dt1` en verde; 108 tests en local; sesión
+  real con curl y dashboard contra la API con DT-4.
+
+### Decisiones tomadas
+
+- **Misma partición 80/20 que DT-1**, con la CV solo sobre el 80 %, en lugar del
+  60/20/20 que proponía el ROADMAP: permite comparar con DT-1 sobre las mismas filas.
+- **Limitación declarada:** ese test ya se había observado en DT-1, y parte del diseño
+  (atacar el sobreajuste, excluir la SVM) se informó con lo que DT-1 vio en él.
+- **SVM excluida a priori:** ≈ 89 % del cómputo de DT-1, sin ventaja, y colapsó en la
+  variante de umbral estricto.
+- **Ninguna reelección tras ver el test.** Los modelos servidos son los seleccionados.
+
+### Incidencias
+
+El equipo se reinició el 2026-09-25 y el agente SSH quedó caído; el push necesita la
+passphrase de Luis. Los commits de DT-4 (`0d8d4c9`, `ad518f2`, `41572ed`, `a7bf9ef` y
+el de documentación) quedan locales hasta que Luis los suba.
+
+### Siguiente paso
+
+Pendientes: la parte de DT-5 que falta (pipeline heredado de la raíz: migrar u
+eliminar), la cobertura de DT-6 en CI (65 % frente al 70 % del criterio), el análisis
+de equidad (DT-15), la decisión de plataforma de despliegue y del manejo de los `.pkl`,
+`data/README.md` y la nota de uso de IA.
+
+---
+
 ## 2026-09-23 (tarde) — El servicio pasa a los modelos reales de DT-1
 
 **Fase:** 3 (prototipo)

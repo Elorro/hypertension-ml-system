@@ -20,10 +20,12 @@ features de entrada. Ver [LEAKAGE_ANALYSIS.md](LEAKAGE_ANALYSIS.md).
 (`data/real/cardio/cardio_train.csv`, 70.000 pacientes → 68.678 tras limpieza) en
 [`src/train_cardio_real.py`](../src/train_cardio_real.py), con dos experimentos:
 
-- **A′** — target `cardio`, con ablación de `ap_hi`/`ap_lo`. Medir la presión vale
-  Δ AUC = 0,1103, IC 95 % [0,1027 · 0,1181] (bootstrap pareado).
+- **A′** — target `cardio`, con ablación de `ap_hi`/`ap_lo`. En DT-1, Δ AUC = 0,1103
+  [0,1027 · 0,1181] (histórico: comparaba contra una SVM elegida por macro-F1). Vigente,
+  la ablación controlada de DT-4: **Δ AUC = 0,0991 [0,0919 · 0,1061]**.
 - **B1** — target `hta = (ap_hi ≥ 140) ∨ (ap_lo ≥ 90)` con las dos columnas de
-  presión **excluidas de las features**. AUC 0,6941 [0,6849 · 0,7035].
+  presión **excluidas de las features**. En DT-1, AUC 0,6941 [0,6849 · 0,7035]
+  (histórico); vigente en DT-4, 0,6955 [0,6866 · 0,7049].
 
 **Criterio de aceptación — cumplido.** `python scripts/audit_cardio_leakage.py`:
 la mejor regla determinista sobre las features (árbol CART de profundidad ≤ 3)
@@ -35,8 +37,9 @@ que es lo que demuestra que el buscador de reglas sí detecta leakage cuando exi
 Resultados completos y sus límites: [DT1_RESULTS.md](DT1_RESULTS.md).
 
 **Lo que NO cerraba.** El servicio seguía cargando el modelo sintético; se migró a
-los artefactos `dt1_*` en `6e59035` (2026-09-23). Las métricas de arriba siguen
-sesgadas al alza por DT-3/DT-4, que continúan abiertos.
+los artefactos `dt1_*` en `6e59035` (2026-09-23), y a los de DT-4 en `a7bf9ef`. El sesgo
+por selección sobre el test de las métricas de DT-1 se corrigió en DT-3/DT-4, ya
+cerrados ([DT4_RESULTS.md](DT4_RESULTS.md)).
 
 ### ✅ DT-2 · Corregir el escalado antes del split — *resuelto en el camino de servicio (2026-09-23)*
 
@@ -66,7 +69,7 @@ cuando el servicio deje de depender de ese script.
 `src/train_classical_models.py` conserva el defecto a propósito: forma parte de la
 evidencia reproducible del leakage y no alimenta ningún servicio.
 
-### 🔴 DT-3 · Split estratificado y validación cruzada
+### ✅ DT-3 · Split estratificado y validación cruzada — *resuelto (2026-09-25)*
 
 **Problema.** El split no usa `stratify=y`, y la selección del mejor modelo se hace
 sobre un único split. La diferencia de macro-F1 entre modelos puede estar
@@ -88,7 +91,14 @@ documentada: en B1 los cinco algoritmos quedan dentro del ruido (Random Forest 0
 vs. regresión logística 0,6924, con IC de ancho ±0,009) y así se reporta en
 [DT1_RESULTS.md](DT1_RESULTS.md).
 
-### 🔴 DT-4 · Separar selección de evaluación
+**Cierre (DT-4).** Validación cruzada estratificada de 5 folds sobre el train, con los
+mismos folds para todos los candidatos y el escalado dentro de cada fold. El manifiesto
+(`41572ed`) registra la log-loss, el Brier, el AUC y el ECE de cada fold, con media, sd
+y EE por candidato. La segunda mitad del criterio se documenta con la regla de 1 EE: en
+los tres experimentos varios candidatos quedan dentro de 1 EE del mínimo (5 a 7), y se
+elige el más simple. Ver [DT4_RESULTS.md](DT4_RESULTS.md) §2.
+
+### ✅ DT-4 · Separar selección de evaluación — *resuelto (2026-09-25)*
 
 **Problema.** El mismo conjunto de test elige el modelo ganador y reporta su
 desempeño. El F1 publicado está sesgado al alza por selección.
@@ -102,6 +112,23 @@ el modelo ya elegido.
 **Sin avance (2026-09-17).** `train_cardio_real.py` hereda el defecto: su
 `criterio_seleccion` es `macro_f1 en test`. Es ahora el defecto estadístico más grave
 que queda abierto en el pipeline real.
+
+**Cierre (2026-09-25).** En lugar del split 60/20/20 se mantuvo la partición 80/20 de
+DT-1 y la selección se hizo por validación cruzada **solo sobre el 80 %**: log-loss
+media como métrica (regla de puntuación propia, coherente con servir probabilidades),
+regla de 1 EE y orden de simplicidad declarado. El test se evaluó una vez por
+experimento, sobre el seleccionado; la ablación de A′ y la robustez de B1 son
+evaluaciones adicionales preregistradas que no intervienen en la selección. Un test
+unitario verifica que la CV no lee el test y que cada evaluación ocurre una vez y
+después de su selección.
+
+- Protocolo preregistrado, commiteado antes de entrenar: `0d8d4c9`
+  ([DT4_PROTOCOL.md](DT4_PROTOCOL.md)).
+- Código: `ad518f2` (`src/train_cardio_dt4.py`). Manifiesto de la corrida: `41572ed`.
+  Servicio sobre los modelos nuevos: `a7bf9ef`.
+- Resultados: [DT4_RESULTS.md](DT4_RESULTS.md).
+- **Limitación:** el test ya se había observado en DT-1, y parte del diseño se informó
+  con lo que DT-1 vio en él. No es un test virgen.
 
 ---
 
@@ -155,14 +182,14 @@ decisión (a)/(b) sobre los scripts de la raíz, que no se han tocado.
 
 **Criterio de aceptación.** `pytest` verde en CI, cobertura > 70 % sobre `src/` y `api/`.
 
-**Estado parcial (2026-09-23).** Hay suite (`86a5c29`, `6e59035`, `a9b89ee`): 90 tests
-en local. Los de contrato de la API y del dashboard corren en CI con un doble del
+**Estado parcial (2026-09-23; actualizado 2026-09-26).** Hay suite (`86a5c29`,
+`6e59035`, `a9b89ee`, `ad518f2`, `a7bf9ef`): 108 tests en local. Los de contrato de la API y del dashboard corren en CI con un doble del
 modelo; los de integración (`requires_artifacts`, `requires_data`) se saltan en CI con
 el motivo visible. El contrato de features está cubierto: la matriz de la API es
 idéntica bit a bit a la del entrenamiento sobre el CSV. El plan de arriba (con
-`/predecir`) quedó superado por el contrato nuevo. Falta el criterio de cobertura:
-65 % sobre `src/` + `api/` en local, arrastrado por `generate_dataset.py` y
-`train_classical_models.py` sin tests.
+`/predecir`) quedó superado por el contrato nuevo. Falta el criterio de cobertura: sobre
+`src/` + `api/`, 72 % en local (con `.pkl` y CSV) pero 65 % en CI, donde se mide el
+criterio; lo arrastran `generate_dataset.py` y `train_classical_models.py`, sin tests.
 
 ### ✅ DT-7 · Validación de rangos en el servicio — *resuelto (2026-09-23)*
 
@@ -279,9 +306,10 @@ que afecte a personas.
 El dashboard mostraba probabilidades como si fueran confianzas calibradas. Verificar
 con curvas de calibración y aplicar `CalibratedClassifierCV` si hace falta.
 
-**Estado parcial (2026-09-23).** La verificación existe para los modelos servidos:
-curvas de calibración en el manifiesto y ECE de 0,0118 (A′) y 0,0069 (B1), medidos
-sobre el mismo test que eligió al ganador (DT-4). No se aplicó calibración post-hoc.
+**Estado parcial (2026-09-23; actualizado 2026-09-26).** La verificación existe para
+los modelos servidos (DT-4): curvas de calibración en el manifiesto y ECE de 0,0141 (A′)
+y 0,0079 (B1) en test, más el ECE por fold en la validación cruzada. En A′ el ECE es
+mayor que el de DT-1 (0,0118); no hay IC del ECE. No se aplicó calibración post-hoc.
 La API y el dashboard dicen «probabilidad (ECE medido en test: …)», no «calibrada».
 
 ---
@@ -289,7 +317,7 @@ La API y el dashboard dicen «probabilidad (ECE medido en test: …)», no «cal
 ## Orden de ejecución sugerido
 
 ```
-DT-1 ✅ ─► DT-2 ✅ ─► DT-3 ──► DT-4      Fase 1: sin esto, nada más importa
+DT-1 ✅ ─► DT-2 ✅ ─► DT-3 ✅ ─► DT-4 ✅   Fase 1: sin esto, nada más importa
                               │
                               ▼
                     DT-5 ◐ ─► DT-6 ◐ ─► DT-7 ✅, DT-8 ✅      Fase 2

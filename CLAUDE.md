@@ -18,18 +18,20 @@ clínica. Ver la sección de estado antes de proponer cualquier trabajo.
 
 ## Fase actual
 
-**Fase 3 (prototipo). El servicio sirve los modelos reales de DT-1 desde `6e59035`.**
+**Fase 3 (prototipo). El servicio sirve los modelos de DT-4 desde `a7bf9ef`.**
 
 | Fase | Estado |
 |------|--------|
 | 1. Diseño | ✅ Completa |
-| 2. Validación matemática | ⚠️ DT-1 cerrado; DT-3/DT-4 abiertos |
-| 3. Prototipo | ✅ Funcional (API y dashboard sobre A′ y B1) |
-| 4. Testing | ◐ Suite de contrato e integración (DT-6 parcial: cobertura 65 % < 70 %) |
+| 2. Validación matemática | ✅ DT-1 a DT-4 cerrados (DT-4 con protocolo preregistrado) |
+| 3. Prototipo | ✅ Funcional (API y dashboard sobre A′ y B1 de DT-4) |
+| 4. Testing | ◐ Suite de contrato e integración (DT-6 parcial: cobertura en CI 65 % < 70 %) |
 
-No proponer optimización de hiperparámetros, modelos nuevos ni despliegue hasta
-cerrar **DT-4** (el test elige y evalúa al mismo tiempo). No hay despliegue público;
-plataforma y manejo de los `.pkl` en deploy están sin decidir.
+Cualquier cambio de modelo o de hiperparámetros exige un **protocolo preregistrado
+nuevo** (como `docs/DT4_PROTOCOL.md`), commiteado antes de entrenar; nunca seleccionar
+mirando el test. El test de DT-4 ya se había observado en DT-1 (limitación declarada).
+No hay despliegue público; plataforma y manejo de los `.pkl` en deploy están sin
+decidir (servidos: 32 MB; RSS de la API: 202 MiB).
 
 ## El defecto que dominaba todo lo demás — cerrado en entrenamiento (2026-09-17) y en el servicio (2026-09-23)
 
@@ -63,15 +65,19 @@ B1 — hta SIN presión (real)          65,67 % → 67,95 %    +2,28 pp   PASA
 CONTROL POSITIVO — con ap_hi/ap_lo   65,67 % → 99,27 %   +33,60 pp   FALLA (correcto)
 ```
 
-Resultado honesto: AUC 0,6941 [0,6849 · 0,7035] para estimar hipertensión sin medir
-la presión, con accuracy apenas +3,25 pp sobre el baseline. **Los cinco algoritmos
-empatan dentro del ruido** — no presentar «ganó Random Forest». Detalle en
-`docs/DT1_RESULTS.md`.
+Resultado vigente (DT-4, `docs/DT4_RESULTS.md`): AUC 0,6955 [0,6866 · 0,7049] para
+estimar hipertensión sin medir la presión, con accuracy apenas +3,35 pp sobre el
+baseline. El Random Forest servido es el más simple dentro de 1 EE del mínimo de
+log-loss (un XGBoost poco profundo) — no presentarlo como «ganó Random Forest». La
+regresión logística empata en AUC pero queda fuera de 1 EE en log-loss. La mejora
+frente a DT-1 está en el sobreajuste y el tamaño, no en el AUC. Ablación vigente:
+Δ AUC = 0,0991 [0,0919 · 0,1061]; el 0,1103 de DT-1 es histórico e inflado.
 
-**Qué cambió en el servicio (`6e59035`, `a9b89ee`).** `api/` y `app/` sirven solo los
-artefactos `dt1_*` (A′ y B1); `POST /predecir` y el contrato sintético se eliminaron.
-La API verifica versiones y sha256 contra `models/dt1_manifest.json` al arrancar y no
-arranca si algo no coincide. En API y docs se dice «probabilidad (ECE medido en test:
+**Qué cambió en el servicio (`6e59035`, `a9b89ee`, `a7bf9ef`).** `api/` y `app/` sirven
+solo los artefactos `dt4_*` (A′ y B1); `POST /predecir` y el contrato sintético se
+eliminaron. La API verifica versiones y sha256 contra `models/dt4_manifest.json` al
+arrancar y no arranca si algo no coincide. `dt1_*` y su manifiesto quedan como
+registro. En API y docs se dice «probabilidad (ECE medido en test:
 …)», nunca «calibrada»; B1 no devuelve clase.
 
 ## Estructura y qué está vivo
@@ -80,7 +86,8 @@ arranca si algo no coincide. En API y docs se dice «probabilidad (ECE medido en
 
 ```
 src/cardio_features.py          → fuente única de features, derivación y cotas (DT-1)
-src/train_cardio_real.py        → models/dt1_*.pkl + dt1_manifest.json  (python -m src.train_cardio_real)
+src/train_cardio_real.py        → models/dt1_* (registro de DT-1; no modificar)
+src/train_cardio_dt4.py         → models/dt4_*.pkl + dt4_manifest.json  (make train-dt4; protocolo docs/DT4_PROTOCOL.md)
 src/artefactos.py               → verificación de versiones y sha256 (API y verify_env)
 api/{main,schemas,servicio}.py  → FastAPI :8000 (A′ y B1)
 app/dashboard.py                → Streamlit :8501 (cliente HTTP puro, API_URL)
@@ -115,7 +122,7 @@ Antes de modificar cualquier archivo de la raíz, confirmar con Luis si se migra
   importar `src/cardio_features.py`: es una verificación independiente.
 - **`Estres` sin tilde** en el pipeline sintético de `src/`. Con tilde solo en el heredado.
 - **Orden de features en un solo sitio:** `src/cardio_features.py`. Cambiarlo invalida
-  los `.pkl` de DT-1; los tests de equivalencia lo detectan. Ver `CONTRIBUTING.md`.
+  los `.pkl` de DT-1 y de DT-4; los tests de equivalencia lo detectan. Ver `CONTRIBUTING.md`.
 - **Nunca versionar** `.pkl`, CSV generados ni el `.venv`.
 - **Avisos médicos** presentes en servicio, dashboard y docs. No retirarlos.
 - Documentación y docstrings en español; nombres de código en el idioma que ya usa
@@ -124,8 +131,10 @@ Antes de modificar cualquier archivo de la raíz, confirmar con Luis si se migra
 ## Comandos
 
 ```bash
-make train-real       # DT-1: entrenamiento sobre datos reales (~51 min), genera dt1_*.pkl
-make verify-env       # compuerta: versiones + sha256 + carga y predicción de los .pkl
+make train-dt4        # DT-4: CV + 1 EE + una evaluación en test (~7 min, nohup, logs/dt4_run.log)
+make train-real       # DT-1 (registro): ~51 min, genera dt1_*.pkl
+make verify-env       # compuerta: versiones + sha256 + carga y predicción de los dt4_*.pkl
+make verify-env-dt1   # lo mismo para el registro de DT-1
 make serve-api        # uvicorn :8000 (alias: make api)
 make serve-dashboard  # streamlit :8501 (alias: make dashboard)
 make setup            # pipeline sintético (evidencia; no alimenta al servicio)
@@ -135,17 +144,15 @@ make test             # pytest: contrato siempre; integración se salta sin .pkl
 make lint             # ruff check + ruff format --check
 ```
 
-La API carga los modelos en el lifespan: sin `models/dt1_*.pkl` o con un sha256
+La API carga los modelos en el lifespan: sin `models/dt4_*.pkl` o con un sha256
 distinto al del manifiesto, no arranca.
 
 ## Trabajo pendiente
 
-Priorizado en `docs/ROADMAP.md` con IDs `DT-N`. El orden importa: DT-1 a DT-4 son
-bloqueantes y nada posterior tiene sentido sin ellos.
-
-Siguiente hito concreto (DT-4): split en tres (60/20/20) sobre
-`src/train_cardio_real.py`, seleccionando en validación y tocando el test una sola
-vez. Mientras no esté, las métricas publicadas están sesgadas al alza por selección.
+Priorizado en `docs/ROADMAP.md` con IDs `DT-N`. DT-1 a DT-4 están cerrados. Pendientes
+principales: la parte de DT-5 que falta (pipeline heredado de la raíz: migrar u
+eliminar), la cobertura de DT-6 en CI, el análisis de equidad (DT-15) y la decisión de
+despliegue (plataforma y manejo de los `.pkl`).
 
 ## Fuente de verdad
 

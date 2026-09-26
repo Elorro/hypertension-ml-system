@@ -213,6 +213,24 @@ después, y deja obsoletas algunas afirmaciones de §6 y §7:
   reentrenó: todas las cifras de arriba siguen siendo las de la corrida del 17-sep.
 - Siguen abiertos DT-3 y DT-4, con el sesgo al alza que describe §6.
 
+## Actualización (2026-09-26)
+
+DT-3 y DT-4 están cerrados. Las cifras vigentes son las de
+[DT4_RESULTS.md](DT4_RESULTS.md): selección por log-loss en validación cruzada sobre el
+train, con protocolo preregistrado (`0d8d4c9`), código `ad518f2`, manifiesto `41572ed`,
+y el test evaluado una sola vez; servidas desde `a7bf9ef`. Todo lo de arriba queda como
+histórico. Tres afirmaciones de este documento que DT-4 matiza:
+
+- **Ablación de §3:** el Δ AUC = 0,1103 estaba inflado, porque comparaba el RF con PA
+  contra una SVM sin PA elegida por macro-F1. La ablación controlada de DT-4 da
+  0,0991 [0,0919 · 0,1061], y coincide con el Δ del propio RF que ya figura en la tabla
+  de §3 (0,1004).
+- **«Una regresión logística lo alcanza» (§4, punto 2):** cierto en AUC, no en
+  log-loss. En la CV de DT-4 la regresión logística queda fuera de 1 EE (B1: 0,59190
+  frente a un umbral de 0,58895). El techo en AUC sin presión sigue siendo ≈ 0,69-0,70.
+- **Sobreajuste de §4, punto 3:** los hiperparámetros regularizados que eligió DT-4
+  reducen la brecha train/test de B1 de 0,109 a 0,014 con el mismo AUC en test.
+
 ---
 
 *Aviso médico: este sistema es una demostración de ingeniería de ML. No es un

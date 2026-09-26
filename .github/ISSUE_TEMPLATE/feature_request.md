@@ -26,6 +26,7 @@ labels: enhancement
 
 ## Consideraciones
 
-<!-- Nota: el defecto central (DT-1, target leakage) está cerrado, pero las métricas
-     siguen sesgadas al alza mientras DT-4 esté abierto (el test elige y evalúa).
-     Las mejoras de modelado tienen poco sentido hasta cerrarlo. Ver docs/ROADMAP.md -->
+<!-- Nota: DT-1 (target leakage) y DT-4 (selección separada de la evaluación) están
+     cerrados. Un cambio de modelado exige un protocolo preregistrado nuevo, como
+     docs/DT4_PROTOCOL.md; no se aceptan selecciones hechas mirando el test.
+     Ver docs/ROADMAP.md -->

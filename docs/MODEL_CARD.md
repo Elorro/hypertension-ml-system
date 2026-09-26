@@ -2,11 +2,13 @@
 
 Formato basado en *Model Cards for Model Reporting* (Mitchell et al., 2019).
 
-> **Alcance.** Describe los dos modelos que sirve la API desde `6e59035`
-> (`models/dt1_riesgo_cv_con_pa__*.pkl` y `models/dt1_hta_b1__*.pkl`), entrenados en
-> DT-1 sobre el dataset real. Toda cifra sale de `models/dt1_manifest.json`; el
-> análisis completo está en [DT1_RESULTS.md](DT1_RESULTS.md). El modelo sintético
-> anterior tiene su propia ficha histórica: [MODEL_CARD_SINTETICO.md](MODEL_CARD_SINTETICO.md).
+> **Alcance.** Describe los dos modelos que sirve la API desde `a7bf9ef`
+> (`models/dt4_riesgo_cv_con_pa__*.pkl` y `models/dt4_hta_b1__*.pkl`), seleccionados en
+> DT-4 sobre el dataset real. Toda cifra vigente sale de `models/dt4_manifest.json`; el
+> análisis completo está en [DT4_RESULTS.md](DT4_RESULTS.md). Las cifras de DT-1
+> ([DT1_RESULTS.md](DT1_RESULTS.md)) aparecen aquí solo como históricas. El modelo
+> sintético anterior tiene su propia ficha histórica:
+> [MODEL_CARD_SINTETICO.md](MODEL_CARD_SINTETICO.md).
 
 ---
 
@@ -17,19 +19,23 @@ Formato basado en *Model Cards for Model Reporting* (Mitchell et al., 2019).
 | **Rol** | Principal | Experimental |
 | **Target** | `cardio`: enfermedad cardiovascular, etiqueta original del dataset | `hta = (ap_hi ≥ 140) ∨ (ap_lo ≥ 90)`, umbral JNC7/ESC fijado a priori |
 | **Features** | 12: edad, sexo, talla, peso, IMC, colesterol, glucosa, tabaco, alcohol, actividad, `ap_hi`, `ap_lo` | Las mismas 10 sin `ap_hi`/`ap_lo` (verificado por linaje) |
-| **Algoritmo servido** | Random Forest (300 árboles, `max_depth=12`) | Random Forest (300 árboles, `max_depth=12`) |
+| **Algoritmo servido** | Random Forest (300 árboles, `max_depth=12`, `min_samples_leaf=20`), 26,3 MB | Random Forest (300 árboles, `max_depth=8`, `min_samples_leaf=100`), 5,5 MB |
 | **Salida de la API** | Probabilidad + clase con umbral 0,5 explícito | Solo probabilidad |
 
 Comunes a ambos:
 
 - **Desarrollador:** Luis Araque. **Licencia:** MIT.
-- **Corrida de referencia:** 2026-09-17, `src/train_cardio_real.py`, `seed=42`,
-  Python 3.14.6 · scikit-learn 1.9.1 · numpy 2.5.3.
-- **Preprocesamiento:** `StandardScaler` ajustado solo sobre train. El IMC se calcula
-  como `weight / (height/100)²`; la edad, como `age / 365.25` (años, float).
-- **Selección:** 5 algoritmos (regresión logística, SVM-RBF, árbol, Random Forest,
-  XGBoost), elegidos por macro-F1 **sobre el mismo test que reporta las métricas**
-  (DT-4 abierto).
+- **Corrida de referencia:** 2026-09-25, `src/train_cardio_dt4.py` (`ad518f2`),
+  `seed=42`, Python 3.14.6 · scikit-learn 1.9.1 · numpy 2.5.3 · joblib 1.6.0.
+- **Preprocesamiento:** `StandardScaler` ajustado solo sobre train (dentro de cada fold
+  en la validación cruzada). El IMC se calcula como `weight / (height/100)²`; la edad,
+  como `age / 365.25` (años, float).
+- **Selección (DT-4, protocolo preregistrado `0d8d4c9`):** 25 candidatos por experimento
+  (regresión logística, árbol, Random Forest, XGBoost; SVM excluida a priori), elegidos
+  por log-loss media en validación cruzada de 5 folds **sobre el train** con la regla de
+  un error estándar y un orden de simplicidad declarado. El test se evaluó **una vez**,
+  sobre el seleccionado. En los dos casos el mínimo de log-loss era un XGBoost poco
+  profundo, con el Random Forest dentro de 1 EE.
 - **Probabilidades:** sin calibración post-hoc; su calibración se mide con ECE
   (10 bins uniformes) en test.
 
@@ -72,35 +78,43 @@ Test estratificado, n = 13.736; train n = 54.942.
 
 | Métrica | A′ (con presión) | B1 (sin presión) |
 |---------|------------------|------------------|
-| AUC ROC [IC 95 % bootstrap] | 0,8017 [0,7937 · 0,8088] | 0,6941 [0,6849 · 0,7035] |
-| AUC en train | 0,8585 | 0,8027 |
-| PR-AUC (baseline = prevalencia) | 0,7874 (0,4948) | 0,5277 (0,3433) |
-| Brier (baseline: predecir la prevalencia) | 0,1808 (0,2500) | 0,2020 (0,2254) |
-| ECE, 10 bins uniformes | 0,0118 | 0,0069 |
-| Accuracy con umbral 0,5 (baseline clase mayoritaria) | 73,33 % (50,52 %) | 68,92 % (65,67 %) |
-| Matriz de confusión, umbral 0,5 (VN · FP · FN · VP) | 5.468 · 1.471 · 2.193 · 4.604 | 7.908 · 1.113 · 3.156 · 1.559 |
+| AUC ROC [IC 95 % bootstrap] | 0,8019 [0,7938 · 0,8088] | 0,6955 [0,6866 · 0,7049] |
+| AUC en train | 0,8276 | 0,7097 |
+| Log-loss | 0,5414 | 0,5889 |
+| PR-AUC (baseline = prevalencia) | 0,7858 (0,4948) | 0,5327 (0,3433) |
+| Brier (baseline: predecir la prevalencia) | 0,1807 (0,2500) | 0,2015 (0,2254) |
+| ECE, 10 bins uniformes | 0,0141 | 0,0079 |
+| Accuracy con umbral 0,5 (baseline clase mayoritaria) | 73,49 % (50,52 %) | 69,02 % (65,67 %) |
+| Matriz de confusión, umbral 0,5 (VN · FP · FN · VP) | 5.463 · 1.476 · 2.165 · 4.632 | 8.023 · 998 · 3.257 · 1.458 |
 
 Cómo leerlas:
 
 - **B1 tiene señal, y es modesta.** El IC del AUC está lejos de 0,5, pero la accuracy
-  supera al baseline en solo +3,25 pp y con umbral 0,5 deja 3.156 falsos negativos
-  frente a 1.559 verdaderos positivos. La información está en el ranking. Por eso la
-  API no devuelve clase para B1.
-- **Los algoritmos empatan.** En B1, Random Forest 0,6941 vs. regresión logística
-  0,6924, con un IC de ±0,009. En A′, Random Forest 0,8017 vs. XGBoost 0,7986. Que el
-  servido sea Random Forest no significa que «ganó»: lo defendible es el techo de AUC
-  de cada problema.
-- **Sobreajuste de los hiperparámetros heredados.** La brecha train → test del AUC es
-  de 0,057 en A′ y de 0,109 en B1.
-- **Cuánto vale medir la presión:** en la ablación de A′ (mismas filas, bootstrap
-  pareado), quitar `ap_hi`/`ap_lo` cuesta Δ AUC = 0,1103 [0,1027 · 0,1181].
+  supera al baseline en solo +3,35 pp y con umbral 0,5 deja 3.257 falsos negativos
+  frente a 1.458 verdaderos positivos. La información está en el ranking. Por eso la
+  API no devuelve clase para B1. El techo en AUC sin presión sigue siendo ≈ 0,69-0,70.
+- **La regresión logística no está dentro de 1 EE.** En AUC empataba con el resto
+  (DT-1); en log-loss queda fuera en los dos experimentos (B1: 0,59190 frente a un
+  umbral de 0,58895). El Random Forest servido no «ganó»: es el más simple de los
+  candidatos dentro de 1 EE del mínimo.
+- **Frente a DT-1 (histórico), la mejora en B1 es de sobreajuste y tamaño, no de AUC.**
+  La brecha train → test del AUC pasa de 0,109 a 0,014 y el modelo de 70 a 5,5 MB; el
+  AUC pasa de 0,6941 a 0,6955, dentro del ruido. En A′ la brecha pasa de 0,057 a 0,026 y
+  el modelo de ≈ 60 a 26,3 MB; AUC, log-loss y Brier quedan iguales, y **el ECE empeora
+  de 0,0118 a 0,0141** (no hay IC del ECE).
+- **Cuánto vale medir la presión:** en la ablación controlada de A′ (la misma
+  configuración con y sin `ap_hi`/`ap_lo`, mismas filas, bootstrap pareado), quitar la
+  presión cuesta **Δ AUC = 0,0991 [0,0919 · 0,1061]**. La cifra histórica de DT-1,
+  0,1103, estaba inflada: comparaba contra una SVM elegida por macro-F1. La medida
+  controlada coincide con el Δ del propio Random Forest que DT-1 ya reportaba (0,1004).
 - **Sensibilidad:** excluyendo de test las filas con presión implausible, el AUC no se
-  mueve (A′ 0,8017 → 0,8017 sin 24 filas; B1 0,6941 → 0,6944 sin 20).
+  mueve (A′ 0,8019 sin 24 filas; B1 0,6955 → 0,6958 sin 20).
 
-**Sesgo en el reporte:** el mismo test eligió al ganador entre 5 algoritmos, así que
-todas las cifras están sesgadas al alza por selección (DT-4). Es además una sola
-partición: el IC bootstrap acota el ruido de muestreo del test, no el de partición
-(DT-3).
+**Límites del reporte:** la selección no miró el test, pero ese test ya se había
+observado en DT-1, y el diseño de DT-4 (atacar el sobreajuste, excluir la SVM) se
+informó con lo que DT-1 vio en él: no es un test virgen. El IC bootstrap acota el ruido
+de muestreo del test, no el de partición; la variabilidad entre folds está en el
+manifiesto.
 
 ## Datos de entrenamiento
 
@@ -135,10 +149,12 @@ sensibles de salud (en Colombia, Ley 1581 de 2012 y sus decretos reglamentarios)
 ## Advertencias y recomendaciones
 
 1. **No usar en contexto clínico.** Sin excepción.
-2. **No citar las métricas sin su baseline** ni sin la nota de sesgo por DT-4.
-3. **Antes de cualquier uso serio:** split train/validación/test (DT-4), validación
-   cruzada (DT-3), análisis de equidad (DT-15) y validación externa.
-4. **No hay despliegue público.** El servicio corre en local.
+2. **No citar las métricas sin su baseline** ni sin la nota de que el test ya se había
+   observado en DT-1.
+3. **Antes de cualquier uso serio:** análisis de equidad (DT-15), validación externa y
+   un test no observado previamente.
+4. **No hay despliegue público.** El servicio corre en local; RSS medido de la API con
+   los dos modelos: 202 MiB.
 
 ---
 

@@ -38,30 +38,36 @@ Detalle completo, evidencia y consecuencias en **[docs/LEAKAGE_ANALYSIS.md](docs
 el 2026-09-17 existe un segundo pipeline,
 [`src/train_cardio_real.py`](src/train_cardio_real.py), que entrena sobre el dataset
 real de Kaggle (68.678 pacientes) excluyendo la presión arterial de las features. Ahí
-la pregunta es genuina y la respuesta, modesta: **AUC 0,6941 [0,6849 · 0,7035]** para
-estimar el estado hipertensivo sin medirlo, con una accuracy apenas +3,25 pp sobre el
-baseline de clase mayoritaria. Verificable con:
+la pregunta es genuina y la respuesta, modesta: **AUC 0,6955 [0,6866 · 0,7049]** para
+estimar el estado hipertensivo sin medirlo, con una accuracy apenas +3,35 pp sobre el
+baseline de clase mayoritaria (modelo seleccionado en DT-4). Verificable con:
 
 ```bash
 python scripts/audit_cardio_leakage.py    # criterio de aceptación de DT-1
 ```
 
-Resultados completos en **[docs/DT1_RESULTS.md](docs/DT1_RESULTS.md)**. Desde
-`6e59035` el servicio FastAPI y el dashboard sirven **solo** esos modelos reales
-(A′ con presión arterial y B1 sin ella); el contrato sintético `/predecir` se eliminó.
+Resultados vigentes en **[docs/DT4_RESULTS.md](docs/DT4_RESULTS.md)** (selección por
+validación cruzada con protocolo preregistrado); los de la primera corrida, históricos,
+en [docs/DT1_RESULTS.md](docs/DT1_RESULTS.md). El servicio FastAPI y el dashboard sirven
+**solo** modelos reales (A′ con presión arterial y B1 sin ella), los de DT-4 desde
+`a7bf9ef`; el contrato sintético `/predecir` se eliminó en `6e59035`.
 
 **Lo que sí demuestra este repositorio, y demuestra bien:**
 
 - Pipeline reproducible de datos → entrenamiento → selección de modelo → artefactos.
-- Comparación sistemática de 5 algoritmos con criterio de selección explícito (macro-F1).
+- Selección de modelo preregistrada (`docs/DT4_PROTOCOL.md`, commiteado antes de
+  entrenar): 25 candidatos por experimento, log-loss en validación cruzada de 5 folds
+  sobre el train, regla de un error estándar con orden de simplicidad declarado, y el
+  test evaluado una sola vez sobre el seleccionado.
 - Servicio de inferencia con FastAPI, esquema validado con Pydantic y OpenAPI automático:
   validación del dominio de entrenamiento, contrato anti-leakage (B1 rechaza la
   presión con 422) y verificación de versiones y sha256 de los artefactos al arrancar.
 - Dashboard Streamlit con inferencia individual y masiva vía CSV, cliente HTTP puro.
 - EDA sobre un dataset clínico real (70.000 pacientes, Kaggle).
-- Auditoría de leakage con **control positivo**, y una ablación con bootstrap pareado
-  que cuantifica cuánto vale medir la presión arterial: Δ AUC = 0,1103
-  [0,1027 · 0,1181].
+- Auditoría de leakage con **control positivo**, y una ablación controlada con
+  bootstrap pareado que cuantifica cuánto vale medir la presión arterial:
+  Δ AUC = 0,0991 [0,0919 · 0,1061] (DT-4; el 0,1103 de DT-1 estaba inflado por comparar
+  contra una SVM elegida por macro-F1).
 
 **Aviso médico:** herramienta con fines educativos. No constituye diagnóstico,
 consejo médico ni sustituye la valoración de un profesional de la salud.
@@ -153,12 +159,14 @@ Referencia completa de endpoints y esquemas en **[docs/API.md](docs/API.md)**.
 
 | Endpoint | Modelo | Target | AUC test [IC 95 %] | Salida |
 |----------|--------|--------|--------------------|--------|
-| `POST /v1/riesgo-cardiovascular` | A′ `riesgo_cv_con_pa` | `cardio`, con presión | 0,8017 [0,7937 · 0,8088] | probabilidad + clase (umbral 0,5) |
-| `POST /v1/hipertension-sin-pa` | B1 `hta_b1`, experimental | `hta`, **sin** presión | 0,6941 [0,6849 · 0,7035] | solo probabilidad |
+| `POST /v1/riesgo-cardiovascular` | A′ `riesgo_cv_con_pa`: RF(depth 12, hoja 20) | `cardio`, con presión | 0,8019 [0,7938 · 0,8088] | probabilidad + clase (umbral 0,5) |
+| `POST /v1/hipertension-sin-pa` | B1 `hta_b1`, experimental: RF(depth 8, hoja 100) | `hta`, **sin** presión | 0,6955 [0,6866 · 0,7049] | solo probabilidad |
 
-Ambos ganadores son Random Forest, pero en B1 los cinco algoritmos empatan dentro del
-ruido. Las métricas están sesgadas al alza porque el mismo test eligió al ganador
-(DT-4). Ficha completa en [docs/MODEL_CARD.md](docs/MODEL_CARD.md).
+Seleccionados en DT-4 por log-loss en validación cruzada con la regla de 1 EE; en los
+dos, el mínimo de log-loss era un XGBoost poco profundo con el RF dentro de 1 EE. El
+test se evaluó una sola vez, pero ya se había observado en DT-1 (limitación declarada).
+Recursos medidos en local: RSS de la API con los dos modelos 202 MiB (352 con los de
+DT-1), `.pkl` 32 MB (130). Ficha completa en [docs/MODEL_CARD.md](docs/MODEL_CARD.md).
 
 ## Pipeline sintético: modelos y criterio de selección (evidencia del leakage)
 
@@ -262,7 +270,9 @@ hypertension-ml-system/
 | [MODEL_CARD_SINTETICO.md](docs/MODEL_CARD_SINTETICO.md) | Model card histórica del modelo sintético |
 | [DATA.md](docs/DATA.md) | Diccionario de datos, procedencia y licencias |
 | [API.md](docs/API.md) | Referencia de endpoints |
-| [DT1_RESULTS.md](docs/DT1_RESULTS.md) | Resultados sobre el dataset real y sus límites |
+| [DT4_PROTOCOL.md](docs/DT4_PROTOCOL.md) | Protocolo preregistrado de selección y evaluación |
+| [DT4_RESULTS.md](docs/DT4_RESULTS.md) | Resultados vigentes: selección por CV y una evaluación en test |
+| [DT1_RESULTS.md](docs/DT1_RESULTS.md) | Resultados históricos de la primera corrida sobre el dataset real |
 | [ROADMAP.md](docs/ROADMAP.md) | Deuda técnica priorizada y trabajo futuro |
 | [BITACORA.md](BITACORA.md) | Registro cronológico de decisiones |
 
@@ -270,20 +280,20 @@ hypertension-ml-system/
 
 ## Estado del proyecto
 
-**Fase actual: prototipo funcional sirviendo los modelos reales; DT-4 abierto.**
+**Fase actual: prototipo funcional sirviendo los modelos de DT-4; compuerta de
+validación estadística (DT-1 a DT-4) cerrada.**
 
 - ✅ **DT-1 cerrado** (2026-09-17). El entrenamiento migró al dataset real; ninguna
   regla determinista sobre las features supera al baseline por más de 2,28 pp.
-- ❌ **DT-4 abierto**, y es el defecto estadístico más grave que queda: el ganador se
-  elige por macro-F1 sobre el mismo test que reporta sus métricas, así que las cifras
-  publicadas están sesgadas al alza.
-- ❌ **DT-3 parcial**: split estratificado sí, validación cruzada no. Los cinco
-  algoritmos quedan dentro del ruido entre sí.
-- ✅ **Servicio migrado** (`6e59035`): la API y el dashboard sirven solo A′ y B1 de
-  DT-1. Sigue abierta la otra mitad de DT-5: el pipeline heredado de la raíz.
-- 🟡 **DT-6 parcial**: 90 tests (los de contrato corren en CI; los de integración se
-  saltan sin `.pkl` ni CSV), pero la cobertura de `src/` + `api/` es 65 %, bajo el 70 %
-  del criterio.
+- ✅ **DT-3 y DT-4 cerrados**: selección por log-loss en validación cruzada de 5 folds
+  sobre el train y una sola evaluación en test, con protocolo preregistrado (`0d8d4c9`),
+  código `ad518f2`, manifiesto `41572ed` y servicio `a7bf9ef`. Limitación: el test ya se
+  había observado en DT-1.
+- ✅ **Servicio migrado** (`6e59035`, `a7bf9ef`): la API y el dashboard sirven solo A′ y
+  B1 de DT-4. Sigue abierta la otra mitad de DT-5: el pipeline heredado de la raíz.
+- 🟡 **DT-6 parcial**: 108 tests (los de contrato corren en CI; los de integración se
+  saltan sin `.pkl` ni CSV). Cobertura de `src/` + `api/`: 72 % en local, 65 % en CI,
+  donde se aplica el criterio del 70 %.
 - No hay despliegue público: el servicio corre en local.
 
 Ver [docs/ROADMAP.md](docs/ROADMAP.md) y [BITACORA.md](BITACORA.md).

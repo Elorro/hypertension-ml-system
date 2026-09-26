@@ -7,8 +7,10 @@ base de datos: la comunicación entre etapas ocurre a través del sistema de arc
 (CSV, artefactos `.pkl` y su manifiesto), y entre los servicios finales vía HTTP.
 
 ```
-data/real/cardio/cardio_train.csv ──► train_cardio_real.py ──► models/dt1_*.pkl
-                                              ▲                 models/dt1_manifest.json
+data/real/cardio/cardio_train.csv ──► train_cardio_real.py ──► models/dt1_*  (registro de DT-1)
+                 │                            ▲  limpieza, partición, métricas
+                 └──────────────────► train_cardio_dt4.py ──► models/dt4_*.pkl
+                                              ▲                 models/dt4_manifest.json
                      src/cardio_features.py ──┤                          │
                                               ▼                          ▼
                                     api/ (FastAPI :8000) ◄── verifica con src/artefactos.py
@@ -39,7 +41,22 @@ presión arterial; B1 sin presión), con split estratificado 80/20 y `StandardSc
 ajustado solo sobre train. Persiste `models/dt1_<experimento>__{modelo,scaler}.pkl` y
 `models/dt1_manifest.json` (métricas, IC, calibración, sha256, versiones). Se ejecuta
 como módulo: `python -m src.train_cardio_real`. Resultados en
-[DT1_RESULTS.md](DT1_RESULTS.md).
+[DT1_RESULTS.md](DT1_RESULTS.md). Es el **registro** de DT-1: no se modifica, y sus
+salidas están congeladas por hash en `tests/test_equivalencia_features.py`.
+
+### `src/train_cardio_dt4.py` — selección por validación cruzada (DT-4)
+
+Implementa el protocolo preregistrado [DT4_PROTOCOL.md](DT4_PROTOCOL.md). Reutiliza de
+`train_cardio_real.py` la limpieza, la partición y las métricas. Para cada experimento
+evalúa 25 candidatos con validación cruzada estratificada de 5 folds sobre el train
+(`Pipeline(StandardScaler, modelo)` por fold), elige por log-loss con la regla de 1 EE,
+reajusta el seleccionado sobre todo el train y lo evalúa **una vez** en test
+(`evaluar_en_test` solo acepta el modelo seleccionado). Aborta con el árbol sucio o con
+un CSV distinto; verifica que la partición es la de DT-1. Persiste
+`models/dt4_<experimento>__{modelo,scaler}.pkl` y `models/dt4_manifest.json`
+(resultados por fold, regla aplicada, `pip freeze`, commit y sha256 del protocolo).
+Se lanza con `make train-dt4` (≈ 7 min, en segundo plano). Resultados en
+[DT4_RESULTS.md](DT4_RESULTS.md).
 
 ### `src/artefactos.py` — verificación de artefactos
 
@@ -96,7 +113,9 @@ su `/lote`, más `/health` y `/v1/modelos`. Contrato completo en [API.md](API.md
 - **Carga en lifespan, una vez:** `api/servicio.py` verifica versiones (perfil
   `servicio`) y sha256 con `src/artefactos.py` y carga modelo y scaler de cada
   experimento. Si algo no coincide, la API no arranca. Rutas por `MODEL_DIR` y
-  `MANIFEST_PATH`.
+  `MANIFEST_PATH`; por defecto se sirve `models/dt4_manifest.json` (el de DT-1 sigue
+  siendo servible). Recursos medidos en local con `requirements-serve.txt`: RSS con A′ +
+  B1 cargados, 202 MiB (352 MiB con los modelos de DT-1); `.pkl` servidos, 32 MB (130).
 - **Validación de entrada:** `api/schemas.py`, con `extra="forbid"` (B1 rechaza
   `ap_hi`/`ap_lo`) y las cotas de `src/cardio_features.py`. El IMC se calcula en el
   servidor.
@@ -191,10 +210,12 @@ es la latencia por petición, que el endpoint `/lote` acota en el modo masivo.
 
 **Por qué los artefactos no se versionan.** Los `.pkl` son binarios grandes que
 git no puede diferenciar; versionarlos infla el historial de forma irreversible.
-El repositorio versiona el *código que los produce* y `models/dt1_manifest.json`, con
-el sha256 de cada artefacto; la reproducibilidad se apoya en la semilla fija y en el
-entorno fijado por `requirements.lock.txt`. El costo es que un clon limpio requiere
-`make train-real` (~51 min) antes de arrancar el servicio.
+El repositorio versiona el *código que los produce* y los manifiestos
+(`models/dt1_manifest.json`, `models/dt4_manifest.json`), con el sha256 de cada
+artefacto; la reproducibilidad se apoya en la semilla fija y en el entorno fijado por
+`requirements.lock.txt`. El costo es que un clon limpio requiere `make train-dt4`
+(≈ 7 min) antes de arrancar el servicio. No hay despliegue: cómo llevar los `.pkl` a un
+entorno sin disco persistente sigue sin decidir.
 
 **Por qué se persiste el scaler junto a los modelos.** El escalado forma parte de la
 función de inferencia, no del entrenamiento. Reajustarlo en producción produciría

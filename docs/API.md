@@ -1,6 +1,6 @@
 # Referencia del servicio de inferencia
 
-Servicio REST (FastAPI) que expone **probabilidades** de dos modelos de DT-1,
+Servicio REST (FastAPI) que expone **probabilidades** de dos modelos seleccionados en DT-4,
 entrenados sobre el dataset real *Cardiovascular Disease* (Kaggle, 68.678 filas tras
 limpieza). No es una herramienta clínica y ninguna respuesta es un diagnóstico.
 
@@ -16,8 +16,10 @@ OpenAPI. El prefijo `/v1` de las rutas es el namespace del contrato nuevo, no la
 del proyecto.
 
 Métricas, IC y calibración de cada modelo: `GET /v1/modelos` y
-[DT1_RESULTS.md](DT1_RESULTS.md). El ganador de cada experimento se eligió sobre el
-mismo test que reporta sus métricas (DT-4 abierto): están sesgadas al alza.
+[DT4_RESULTS.md](DT4_RESULTS.md). Cada modelo se eligió por log-loss en validación
+cruzada sobre el train (protocolo preregistrado, [DT4_PROTOCOL.md](DT4_PROTOCOL.md)) y
+el test se evaluó una sola vez; ese test ya se había observado en DT-1 (limitación
+declarada).
 
 ---
 
@@ -28,12 +30,12 @@ pip install -r requirements-serve.txt   # mínimo: sin pandas ni xgboost
 make serve-api                           # uvicorn api.main:app --host 127.0.0.1 --port 8000
 ```
 
-Requiere `models/dt1_*.pkl` (no versionados; se generan con `make train-real`).
+Requiere `models/dt4_*.pkl` (no versionados; se generan con `make train-dt4`, ≈ 7 min).
 
 | Variable | Por defecto | Uso |
 |----------|-------------|-----|
 | `MODEL_DIR` | `models/` del repo | Directorio de los `.pkl` |
-| `MANIFEST_PATH` | `models/dt1_manifest.json` | Manifiesto de DT-1 (versionado) |
+| `MANIFEST_PATH` | `models/dt4_manifest.json` | Manifiesto de DT-4 (versionado). El de DT-1, `models/dt1_manifest.json`, queda como registro y sigue siendo servible |
 
 Los modelos se cargan **una vez, al arrancar** (lifespan), tras verificar contra el
 manifiesto (`src/artefactos.py`, perfil `servicio`):
@@ -47,12 +49,13 @@ manifiesto (`src/artefactos.py`, perfil `servicio`):
 Si algo falla, **el servicio no arranca**:
 
 ```
-src.artefactos.ArtefactoInvalido: [hta_b1] sha256 distinto en …/dt1_hta_b1__scaler.pkl: 10f0df0d684139d1… != manifiesto 3454db2fbdb132ef…
+src.artefactos.ArtefactoInvalido: [hta_b1] sha256 distinto en …/dt4_hta_b1__scaler.pkl: 10f0df0d684139d1… != manifiesto 3454db2fbdb132ef…
 ERROR:    Application startup failed. Exiting.
 ```
 
 Medido en local (Python 3.14.6, `requirements-serve.txt`): venv de 293 MB; proceso con
-A′ + B1 cargados, RSS ≈ 352 MiB (≈ 357 MiB tras lotes de 1.000 filas).
+A′ + B1 de DT-4 cargados, RSS ≈ 202 MiB (≈ 207 MiB tras lotes de 1.000 filas), frente a
+352 MiB con los modelos de DT-1. `.pkl` servidos: 32 MB (130 MB con los de DT-1).
 
 ---
 
@@ -99,12 +102,12 @@ curl -X POST http://127.0.0.1:8000/v1/riesgo-cardiovascular \
 
 ```json
 {
-  "probabilidad": 0.5173238258072131,
+  "probabilidad": 0.5133575026752739,
   "prevalencia_base": 0.49479451057478796,
   "modelo": {
     "experimento": "riesgo_cv_con_pa",
     "algoritmo": "RandomForest",
-    "sha256": "e3a9d7b03d0abc85d51c43bfb8ef433107f8bdd6d96e2dde88fe931c84631ad9"
+    "sha256": "fa42bc7e86936ba753adec2e5b9f098654a8c87cf56de4734e4b9698a88d0428"
   },
   "aviso": "Demostración de ingeniería de ML, no herramienta clínica. Esta probabilidad no es un diagnóstico ni sustituye la medición de la presión arterial ni la valoración de un profesional de salud.",
   "clase": 1,
@@ -114,7 +117,7 @@ curl -X POST http://127.0.0.1:8000/v1/riesgo-cardiovascular \
 
 | Campo | Descripción |
 |-------|-------------|
-| `probabilidad` | Probabilidad estimada de la clase positiva, en [0, 1]. Sin calibración post-hoc; ECE medido en test: 0,0118. |
+| `probabilidad` | Probabilidad estimada de la clase positiva, en [0, 1]. Sin calibración post-hoc; ECE medido en test: 0,0141. |
 | `prevalencia_base` | Prevalencia de la clase positiva en el train del modelo: la referencia sin información. |
 | `modelo` | Experimento, algoritmo y sha256 del `.pkl`, verificado al arrancar. |
 | `clase` | `1` si `probabilidad >= umbral`. Solo en A′. |
@@ -123,10 +126,10 @@ curl -X POST http://127.0.0.1:8000/v1/riesgo-cardiovascular \
 
 ## `POST /v1/hipertension-sin-pa` — B1 (experimental)
 
-Estima hipertensión **sin medir la presión arterial**. AUC 0,694 [0,685 · 0,704].
-La respuesta **no incluye `clase`**: con umbral 0,5 el ganador deja 3.156 falsos
-negativos frente a 1.559 verdaderos positivos en test. La información está en el
-ranking; la probabilidad ordena riesgo, no diagnostica. ECE medido en test: 0,0069.
+Estima hipertensión **sin medir la presión arterial**. AUC 0,696 [0,687 · 0,705].
+La respuesta **no incluye `clase`**: con umbral 0,5 el modelo servido deja 3.257 falsos
+negativos frente a 1.458 verdaderos positivos en test. La información está en el
+ranking; la probabilidad ordena riesgo, no diagnostica. ECE medido en test: 0,0079.
 
 ```bash
 curl -X POST http://127.0.0.1:8000/v1/hipertension-sin-pa \
@@ -137,12 +140,12 @@ curl -X POST http://127.0.0.1:8000/v1/hipertension-sin-pa \
 
 ```json
 {
-  "probabilidad": 0.24529955468511658,
+  "probabilidad": 0.24104744560537572,
   "prevalencia_base": 0.3432710858723745,
   "modelo": {
     "experimento": "hta_b1",
     "algoritmo": "RandomForest",
-    "sha256": "cdd2abc8762637fa35ffde3622c5bc9ff787f81642271488854cdfb0f6c58406"
+    "sha256": "d12ee51fc5df48f558de867e5c40f5d51c7f0d05a9c7273e95f5633cc6a52424"
   },
   "aviso": "Demostración de ingeniería de ML, no herramienta clínica. Esta probabilidad no es un diagnóstico ni sustituye la medición de la presión arterial ni la valoración de un profesional de salud."
 }
@@ -174,12 +177,12 @@ curl -X POST http://127.0.0.1:8000/v1/hipertension-sin-pa/lote \
       "indice": 0,
       "ok": true,
       "resultado": {
-        "probabilidad": 0.7307727670995435,
+        "probabilidad": 0.6493759992470167,
         "prevalencia_base": 0.3432710858723745,
         "modelo": {
           "experimento": "hta_b1",
           "algoritmo": "RandomForest",
-          "sha256": "cdd2abc8762637fa35ffde3622c5bc9ff787f81642271488854cdfb0f6c58406"
+          "sha256": "d12ee51fc5df48f558de867e5c40f5d51c7f0d05a9c7273e95f5633cc6a52424"
         },
         "aviso": "Demostración de ingeniería de ML, no herramienta clínica. Esta probabilidad no es un diagnóstico ni sustituye la medición de la presión arterial ni la valoración de un profesional de salud."
       },
@@ -213,8 +216,8 @@ Más de 1.000 filas es un error del lote completo (sin eco de la entrada):
   "estado": "ok",
   "version_api": "2.0.0",
   "modelos": [
-    {"experimento": "riesgo_cv_con_pa", "algoritmo": "RandomForest", "sha256": "e3a9d7b03d0abc85d51c43bfb8ef433107f8bdd6d96e2dde88fe931c84631ad9"},
-    {"experimento": "hta_b1", "algoritmo": "RandomForest", "sha256": "cdd2abc8762637fa35ffde3622c5bc9ff787f81642271488854cdfb0f6c58406"}
+    {"experimento": "riesgo_cv_con_pa", "algoritmo": "RandomForest", "sha256": "fa42bc7e86936ba753adec2e5b9f098654a8c87cf56de4734e4b9698a88d0428"},
+    {"experimento": "hta_b1", "algoritmo": "RandomForest", "sha256": "d12ee51fc5df48f558de867e5c40f5d51c7f0d05a9c7273e95f5633cc6a52424"}
   ],
   "entorno": {"python": "3.14.6", "scikit_learn": "1.9.1", "numpy": "2.5.3", "joblib": "1.6.0"}
 }
@@ -231,27 +234,37 @@ de cada código; con eso, y nada más, el dashboard construye sus formularios),
 `derivadas_en_servidor`,
 `orden_features_modelo`, `prevalencia_base`, `metricas_test` (AUC con IC 95 %
 bootstrap, Brier y su baseline, ECE de 10 bins, matriz de confusión con umbral 0,5),
-`devuelve_clase`, `umbral_clase` y, en B1, `advertencia`. Incluye `max_filas_lote` y
-`nota_metricas` (sesgo de selección por DT-4). Extracto de B1:
+`devuelve_clase`, `umbral_clase`, `seleccion` (criterio, candidato e hiperparámetros,
+mejor en CV, cuántos quedaron dentro de 1 EE, y que el test no intervino) y, en B1,
+`advertencia`. Incluye `max_filas_lote` y `nota_metricas` (cómo se seleccionó y la
+limitación del test ya observado en DT-1). Extracto de B1:
 
 ```json
 {
   "experimento": "hta_b1",
   "rol": "experimental",
   "definicion_target": "hta = (ap_hi >= 140) | (ap_lo >= 90)",
+  "seleccion": {
+    "criterio": "log-loss media en validación cruzada de 5 folds sobre train; regla de 1 EE",
+    "candidato": "RandomForest(max_depth=8,min_samples_leaf=100)",
+    "hiperparametros": {"max_depth": 8, "min_samples_leaf": 100},
+    "mejor_en_cv": "XGBoost(max_depth=3,min_child_weight=1)",
+    "n_elegibles_dentro_de_1_ee": 7,
+    "test_intervino_en_la_seleccion": false
+  },
   "prevalencia_base": 0.3432710858723745,
   "metricas_test": {
     "n_test": 13736,
-    "roc_auc": 0.6941329192647344,
-    "roc_auc_ic95_bootstrap": [0.6849474093539638, 0.7035342075161453],
-    "brier": 0.20198319760506567,
+    "roc_auc": 0.695460280436728,
+    "roc_auc_ic95_bootstrap": [0.6866486677440173, 0.7049276641456452],
+    "brier": 0.20154744492370275,
     "brier_baseline_prevalencia": 0.22543213072444335,
-    "ece_uniform_10": 0.00692836747610194,
-    "confusion_matrix_umbral_0_5": {"tn": 7908, "fp": 1113, "fn": 3156, "tp": 1559}
+    "ece_uniform_10": 0.00792668979225035,
+    "confusion_matrix_umbral_0_5": {"tn": 8023, "fp": 998, "fn": 3257, "tp": 1458}
   },
   "devuelve_clase": false,
   "umbral_clase": null,
-  "advertencia": "Experimental. Estima hipertensión SIN medir la presión arterial. La información está en el ranking de riesgo, no en la decisión binaria: con umbral 0,5 el ganador deja 3156 falsos negativos frente a 1559 verdaderos positivos en test. Por eso la respuesta no incluye clase. La probabilidad ordena riesgo; no diagnostica."
+  "advertencia": "Experimental. Estima hipertensión SIN medir la presión arterial. La información está en el ranking de riesgo, no en la decisión binaria: con umbral 0,5 el modelo servido deja 3257 falsos negativos frente a 1458 verdaderos positivos en test. Por eso la respuesta no incluye clase. La probabilidad ordena riesgo; no diagnostica."
 }
 ```
 
@@ -308,8 +321,8 @@ print(f"P = {r['probabilidad']:.3f}  (prevalencia base {r['prevalencia_base']:.3
 
 | Limitación | Impacto | Estado |
 |------------|---------|--------|
-| Métricas sesgadas por selección | El test que reporta también eligió al ganador | DT-4, [ROADMAP](ROADMAP.md) |
-| `.pkl` fuera de git (≈ 130 MB) | Un despliegue necesita otra vía para los artefactos | pendiente |
+| Test ya observado en DT-1 | La selección de DT-4 no lo mira, pero no es un test virgen | limitación declarada, [DT4_PROTOCOL.md](DT4_PROTOCOL.md) |
+| `.pkl` fuera de git (≈ 32 MB servidos) | Un despliegue necesita otra vía para los artefactos | pendiente |
 | Sin autenticación ni rate limiting | Solo apto para uso local | [ROADMAP](ROADMAP.md) |
 | Sin logging estructurado | Solo el log de uvicorn | [ROADMAP](ROADMAP.md) |
 | Validez externa | Un solo dataset, sin análisis de equidad | DT-15, [ROADMAP](ROADMAP.md) |

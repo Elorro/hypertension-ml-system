@@ -8,11 +8,12 @@ entorno, qué estándares sigue el código y cómo proponer cambios.
 ## Antes de empezar
 
 Lee **[docs/LEAKAGE_ANALYSIS.md](docs/LEAKAGE_ANALYSIS.md)** y
-**[docs/DT1_RESULTS.md](docs/DT1_RESULTS.md)**. El proyecto nació con un defecto
+**[docs/DT4_RESULTS.md](docs/DT4_RESULTS.md)**. El proyecto nació con un defecto
 metodológico en su núcleo (target leakage), que DT-1 corrigió migrando a datos reales;
-el pipeline sintético se conserva como evidencia. Las métricas actuales siguen
-sesgadas al alza mientras DT-4 esté abierto. Contribuir sin ese contexto lleva a
-optimizar métricas que no significan nada.
+el pipeline sintético se conserva como evidencia. DT-4 separó la selección de la
+evaluación con un protocolo preregistrado ([docs/DT4_PROTOCOL.md](docs/DT4_PROTOCOL.md)):
+un cambio de modelo o de hiperparámetros exige un protocolo nuevo, no tocar el test.
+Contribuir sin ese contexto lleva a optimizar métricas que no significan nada.
 
 Las tareas abiertas están priorizadas en **[docs/ROADMAP.md](docs/ROADMAP.md)** con
 identificadores `DT-N`. Referéncialos en tus commits y PRs.
@@ -76,9 +77,11 @@ Al añadir un algoritmo nuevo:
 2. Regístralo en el diccionario `resultados` para que compita por macro-F1.
 3. Documéntalo en la tabla de modelos del README.
 
-En el pipeline de DT-1 (`src/train_cardio_real.py`), el ganador se registra en el
-manifiesto y la API lo carga desde ahí; si fuera XGBoost, el perfil `servicio` de
-`src/artefactos.py` exigiría además `xgboost` exacto en `requirements-serve.txt`.
+En el pipeline servido (`src/train_cardio_dt4.py`), los candidatos y el orden de
+simplicidad están fijados por el protocolo preregistrado; añadir uno exige un protocolo
+nuevo. El seleccionado se registra en el manifiesto y la API lo carga desde ahí; si
+fuera XGBoost, el perfil `servicio` de `src/artefactos.py` exigiría además `xgboost`
+exacto en `requirements-serve.txt`.
 
 Al reportar métricas, incluye siempre la comparación contra el baseline pertinente
 (regla clínica en el dataset sintético, clase mayoritaria en datos reales). Una
