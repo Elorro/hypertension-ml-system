@@ -1,6 +1,6 @@
-"""Servicio de inferencia de DT-1: probabilidad, no diagnóstico.
+"""Servicio de inferencia: probabilidad, no diagnóstico.
 
-Sirve dos modelos entrenados sobre el dataset real (``models/dt1_*.pkl``):
+Sirve dos modelos entrenados sobre el dataset real (por defecto ``models/dt4_*.pkl``):
 
 * ``POST /v1/riesgo-cardiovascular`` — A′, con presión arterial (principal).
 * ``POST /v1/hipertension-sin-pa`` — B1, sin presión arterial (experimental).
@@ -11,7 +11,8 @@ sha256 contra el manifiesto: si algo no coincide, el servicio no arranca.
 Configuración por variables de entorno:
 
 * ``MODEL_DIR`` — directorio de los ``.pkl`` (por defecto ``models/`` del repo).
-* ``MANIFEST_PATH`` — manifiesto de DT-1 (por defecto ``models/dt1_manifest.json``).
+* ``MANIFEST_PATH`` — manifiesto (por defecto ``models/dt4_manifest.json``; el de DT-1,
+  ``models/dt1_manifest.json``, queda como registro y sigue siendo servible).
 
 Uso (desde la raíz del repositorio)::
 
@@ -57,6 +58,8 @@ from api.servicio import (
     cargar_registro,
     entorno_en_ejecucion,
     metricas_test,
+    nota_metricas,
+    seleccion,
 )
 from src.cardio_features import BMI_RANGE
 
@@ -77,7 +80,7 @@ class Config:
     def desde_entorno(cls) -> Config:
         return cls(
             model_dir=Path(os.environ.get("MODEL_DIR", ROOT / "models")),
-            manifest_path=Path(os.environ.get("MANIFEST_PATH", ROOT / "models" / "dt1_manifest.json")),
+            manifest_path=Path(os.environ.get("MANIFEST_PATH", ROOT / "models" / "dt4_manifest.json")),
         )
 
 
@@ -157,7 +160,7 @@ def create_app(cargar_artefactos: bool = True) -> FastAPI:
         yield
 
     app = FastAPI(
-        title="API de riesgo cardiovascular e hipertensión (DT-1)",
+        title="API de riesgo cardiovascular e hipertensión",
         version=API_VERSION,
         description=(
             "Probabilidades estimadas por dos modelos entrenados sobre el *Cardiovascular Disease "
@@ -213,6 +216,7 @@ def create_app(cargar_artefactos: bool = True) -> FastAPI:
                         "definicion", "cardio: enfermedad cardiovascular, etiqueta original del dataset"
                     ),
                     "algoritmo": servido.algoritmo,
+                    "seleccion": seleccion(servido),
                     "sha256": servido.sha256,
                     "entrada": {"campos": schema["properties"], "requeridos": schema["required"]},
                     "derivadas_en_servidor": {
@@ -229,12 +233,7 @@ def create_app(cargar_artefactos: bool = True) -> FastAPI:
         return {
             "modelos": catalogo,
             "max_filas_lote": MAX_FILAS_LOTE,
-            "nota_metricas": (
-                "Métricas del ganador sobre el test de DT-1. La probabilidad no lleva calibración "
-                "post-hoc; su calibración se mide con ECE (10 bins uniformes) en ese test. El mismo "
-                "test eligió al ganador entre 5 algoritmos (DT-4 abierto): las cifras están "
-                "sesgadas al alza por selección."
-            ),
+            "nota_metricas": nota_metricas(registro.manifiesto),
             "aviso": AVISO,
         }
 

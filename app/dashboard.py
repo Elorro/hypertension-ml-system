@@ -1,4 +1,4 @@
-"""Dashboard Streamlit: cliente HTTP puro de la API de DT-1.
+"""Dashboard Streamlit: cliente HTTP puro de la API de riesgo cardiovascular.
 
 No importa scikit-learn ni carga modelos. Todo lo que muestra —campos, límites,
 etiquetas de los códigos, métricas— viene de ``GET /v1/modelos`` y de las
@@ -304,7 +304,7 @@ def seccion_metricas(catalogo: dict[str, Any]) -> None:
 # Página
 # =======================================================
 def main() -> None:
-    st.set_page_config(page_title="Riesgo cardiovascular — DT-1", page_icon="🩺", layout="wide")
+    st.set_page_config(page_title="Riesgo cardiovascular", page_icon="🩺", layout="wide")
     st.title("🩺 Riesgo cardiovascular e hipertensión — demostración")
     st.markdown(AVISO_LOCAL)
 
@@ -355,8 +355,8 @@ def main() -> None:
         t = b1["metricas_test"]
         st.header("B1 — Hipertensión sin presión arterial · EXPERIMENTAL")
         st.warning(
-            f"Sin presión arterial; AUC ≈ {_dec(t['roc_auc'], 2)} "
-            f"[{_dec(t['roc_auc_ic95_bootstrap'][0], 2)} · {_dec(t['roc_auc_ic95_bootstrap'][1], 2)}]. "
+            f"Sin presión arterial; AUC ≈ {_dec(t['roc_auc'])} "
+            f"[{_dec(t['roc_auc_ic95_bootstrap'][0])} · {_dec(t['roc_auc_ic95_bootstrap'][1])}]. "
             "La probabilidad ordena riesgo, no diagnostica."
         )
         with st.expander("Por qué no hay clase"):

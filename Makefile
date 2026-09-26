@@ -1,4 +1,4 @@
-.PHONY: help venv install install-dev data train train-real train-dt4 setup api dashboard serve-api serve-dashboard audit audit-real verify-env test lint format clean
+.PHONY: help venv install install-dev data train train-real train-dt4 setup api dashboard serve-api serve-dashboard audit audit-real verify-env verify-env-dt1 test lint format clean
 
 PYTHON   := python
 # Intérprete base de la corrida de referencia de DT-1 (Python 3.14.6).
@@ -39,7 +39,7 @@ train-dt4:  ## DT-4: CV + 1 EE + una evaluación en test, en segundo plano (log 
 
 setup: data train  ## Pipeline sintético (evidencia del leakage; ya no alimenta al servicio)
 
-serve-api:  ## Levanta la API con los modelos de DT-1 (requiere models/dt1_*.pkl)
+serve-api:  ## Levanta la API con los modelos de DT-4 (requiere models/dt4_*.pkl)
 	uvicorn api.main:app --host $(HOST) --port $(PORT)
 
 serve-dashboard:  ## Levanta el dashboard (cliente de la API; API_URL, por defecto :8000)
@@ -55,8 +55,11 @@ audit:  ## Auditoría de target leakage del dataset sintético
 audit-real:  ## Criterio de aceptación de DT-1 sobre el dataset real
 	$(PYTHON) scripts/audit_cardio_leakage.py
 
-verify-env:  ## Compuerta del entorno: versiones + sha256 + carga y predicción de los .pkl de DT-1
+verify-env:  ## Compuerta del entorno: versiones + sha256 + carga y predicción de los .pkl servidos (DT-4)
 	$(PYTHON) -m scripts.verify_env
+
+verify-env-dt1:  ## Lo mismo para el registro de DT-1 (models/dt1_*)
+	$(PYTHON) -m scripts.verify_env --manifest models/dt1_manifest.json
 
 test:  ## Ejecuta la suite; los tests que necesitan .pkl o el CSV real se saltan con motivo visible
 	$(PYTHON) -m pytest --cov=src --cov=api --cov-report=term-missing

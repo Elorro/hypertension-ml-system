@@ -1,6 +1,7 @@
 """Registro de modelos servidos y construcción de la matriz de features.
 
-La API sirve dos experimentos de DT-1 y ninguno más:
+La API sirve dos experimentos, los de DT-4 por defecto (``models/dt4_manifest.json``;
+el manifiesto de DT-1 sigue siendo servible por ``MANIFEST_PATH``) y ninguno más:
 
 * ``riesgo_cv_con_pa`` (A′) — riesgo cardiovascular, con presión arterial.
 * ``hta_b1`` (B1, experimental) — hipertensión sin presión arterial.
@@ -112,8 +113,15 @@ def entorno_en_ejecucion() -> dict[str, str]:
 # =======================================================
 # Metadatos para /v1/modelos
 # =======================================================
+def _metricas(servido: ModeloServido) -> dict[str, Any]:
+    """Métricas en test del modelo servido: bloque ``test`` (manifiesto v2, DT-4) o las del
+    ganador en ``modelos`` (manifiesto de DT-1)."""
+    b = servido.bloque
+    return b["test"] if "test" in b else b["modelos"][servido.algoritmo]
+
+
 def metricas_test(servido: ModeloServido) -> dict[str, Any]:
-    m = servido.bloque["modelos"][servido.algoritmo]
+    m = _metricas(servido)
     return {
         "n_test": m["n_test"],
         "prevalencia_test": m["prevalencia_test"],
@@ -126,11 +134,45 @@ def metricas_test(servido: ModeloServido) -> dict[str, Any]:
     }
 
 
+def seleccion(servido: ModeloServido) -> dict[str, Any]:
+    """Cómo se eligió el modelo servido, según el manifiesto."""
+    b = servido.bloque
+    if "seleccion" not in b:  # DT-1
+        return {"criterio": b.get("criterio_seleccion"), "algoritmo": servido.algoritmo}
+    s = b["seleccion"]
+    return {
+        "criterio": "log-loss media en validación cruzada de 5 folds sobre train; regla de 1 EE",
+        "candidato": b["candidato_seleccionado"],
+        "hiperparametros": b["hiperparametros"],
+        "mejor_en_cv": s["mejor"],
+        "n_elegibles_dentro_de_1_ee": len(s["elegibles"]),
+        "test_intervino_en_la_seleccion": False,
+    }
+
+
+def nota_metricas(manifiesto: dict[str, Any]) -> str:
+    base = (
+        "La probabilidad no lleva calibración post-hoc; su calibración se mide con ECE (10 bins "
+        "uniformes) en test."
+    )
+    if manifiesto.get("hito") == "DT-4":
+        return (
+            "Métricas del modelo seleccionado sobre el test, evaluado una sola vez después de la "
+            "selección (DT-4, protocolo preregistrado en docs/DT4_PROTOCOL.md). La selección se hizo "
+            "por log-loss media en validación cruzada de 5 folds sobre el train, con la regla de 1 EE; "
+            f"el test no intervino. {base} Limitación declarada: ese test ya se había observado en DT-1."
+        )
+    return (
+        f"Métricas del ganador sobre el test de DT-1. {base} El mismo test eligió al ganador entre 5 "
+        "algoritmos: las cifras están sesgadas al alza por selección (corregido en DT-4)."
+    )
+
+
 def advertencia_b1(servido: ModeloServido) -> str:
-    cm = servido.bloque["modelos"][servido.algoritmo]["confusion_matrix"]
+    cm = _metricas(servido)["confusion_matrix"]
     return (
         "Experimental. Estima hipertensión SIN medir la presión arterial. La información está en el "
-        "ranking de riesgo, no en la decisión binaria: con umbral 0,5 el ganador deja "
+        "ranking de riesgo, no en la decisión binaria: con umbral 0,5 el modelo servido deja "
         f"{cm['fn']} falsos negativos frente a {cm['tp']} verdaderos positivos en test. Por eso la "
         "respuesta no incluye clase. La probabilidad ordena riesgo; no diagnostica."
     )

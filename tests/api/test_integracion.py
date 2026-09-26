@@ -9,7 +9,7 @@ import pytest
 
 from src.artefactos import ArtefactoInvalido
 from tests.api.conftest import BASE_OK, PA_OK
-from tests.conftest import ARTEFACTOS, MANIFEST_PATH
+from tests.conftest import ARTEFACTOS, MANIFEST_DT4_PATH
 
 pytestmark = pytest.mark.requires_artifacts
 
@@ -89,7 +89,7 @@ def test_no_arranca_con_sha_alterado(tmp_path: Path, monkeypatch: pytest.MonkeyP
 
     from api.main import create_app
 
-    alterado = "dt1_hta_b1__scaler.pkl"
+    alterado = "dt4_hta_b1__scaler.pkl"
     for pkl in ARTEFACTOS:
         destino = tmp_path / pkl.name
         if pkl.name == alterado:
@@ -99,7 +99,7 @@ def test_no_arranca_con_sha_alterado(tmp_path: Path, monkeypatch: pytest.MonkeyP
         else:
             destino.symlink_to(pkl)
     monkeypatch.setenv("MODEL_DIR", str(tmp_path))
-    monkeypatch.setenv("MANIFEST_PATH", str(MANIFEST_PATH))
+    monkeypatch.setenv("MANIFEST_PATH", str(MANIFEST_DT4_PATH))
 
     with (
         pytest.raises(ArtefactoInvalido, match=rf"sha256 distinto en .*{alterado}"),

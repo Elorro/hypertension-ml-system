@@ -1,6 +1,6 @@
 """Fixtures comunes y salto explícito de los tests que necesitan archivos fuera de git.
 
-* ``requires_artifacts`` — necesita ``models/dt1_*.pkl`` (no versionados).
+* ``requires_artifacts`` — necesita ``models/dt4_*.pkl``, los servidos (no versionados).
 * ``requires_data`` — necesita ``data/real/cardio/cardio_train.csv`` (no redistribuible).
 
 Sin esos archivos el test se salta con el motivo visible en la salida (``-rs``).
@@ -15,16 +15,17 @@ from typing import Any
 import pytest
 
 ROOT = Path(__file__).resolve().parents[1]
-MANIFEST_PATH = ROOT / "models" / "dt1_manifest.json"
+MANIFEST_PATH = ROOT / "models" / "dt1_manifest.json"  # registro de DT-1
+MANIFEST_DT4_PATH = ROOT / "models" / "dt4_manifest.json"  # el servido
 DATA_PATH = ROOT / "data" / "real" / "cardio" / "cardio_train.csv"
-ARTEFACTOS = sorted((ROOT / "models").glob("dt1_*.pkl"))
+ARTEFACTOS = sorted((ROOT / "models").glob("dt4_*.pkl"))  # los que carga la API
 
 
 def pytest_collection_modifyitems(config: pytest.Config, items: list[pytest.Item]) -> None:
     motivos = {
         "requires_artifacts": (
             len(ARTEFACTOS) < 6,
-            "faltan models/dt1_*.pkl (no versionados; `make train-real`)",
+            "faltan models/dt4_*.pkl (no versionados; `make train-dt4`)",
         ),
         "requires_data": (
             not DATA_PATH.exists(),

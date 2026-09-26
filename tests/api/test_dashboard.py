@@ -78,8 +78,12 @@ def test_a_prima_muestra_probabilidad_y_clase(app_test):
     assert any("no herramienta clínica" in i.value for i in app_test.info)
 
 
-def test_b1_experimental_sin_clase(app_test):
-    assert any("Sin presión arterial; AUC ≈ 0,69" in w.value for w in app_test.warning)
+def test_b1_experimental_sin_clase(app_test, manifiesto):
+    t = manifiesto["experimentos"]["B1_experimento"]["principal"]["test"]
+    lo, hi = t["roc_auc_ic95_bootstrap"]
+    # Tres decimales, como la tabla de métricas: el límite superior no coincide con el valor.
+    esperado = f"Sin presión arterial; AUC ≈ {t['roc_auc']:.3f} [{lo:.3f} · {hi:.3f}]".replace(".", ",")
+    assert any(esperado in w.value for w in app_test.warning)
     app_test.button(key=SUBMIT_B1).click().run()
     assert {m.label: m.value for m in app_test.metric}["Probabilidad estimada"] == "41,0%"
     assert not any("Clase con umbral" in m.value for m in app_test.markdown)
@@ -161,5 +165,5 @@ def test_auc_de_b1_sale_de_v1_modelos(client, monkeypatch: pytest.MonkeyPatch):
     at = AppTest.from_file(DASHBOARD, default_timeout=30).run()
     assert not at.exception, at.exception
     textos = [w.value for w in at.warning]
-    assert any("Sin presión arterial; AUC ≈ 0,55 [0,50 · 0,60]" in t for t in textos), textos
+    assert any("Sin presión arterial; AUC ≈ 0,551 [0,501 · 0,605]" in t for t in textos), textos
     assert not any("0,69" in t for t in textos)

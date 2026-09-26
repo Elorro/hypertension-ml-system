@@ -35,6 +35,16 @@ def dobles() -> Dobles:
     return Dobles(riesgo_cv=PredictorDoble(0.73), hta_b1=PredictorDoble(0.41))
 
 
+@pytest.fixture(scope="session")
+def manifiesto() -> dict[str, Any]:
+    """En los tests de la API, el manifiesto es el servido: el de DT-4."""
+    import json
+
+    from tests.conftest import MANIFEST_DT4_PATH
+
+    return json.loads(MANIFEST_DT4_PATH.read_text())
+
+
 @pytest.fixture
 def client(manifiesto: dict[str, Any], dobles: Dobles):
     """API sin artefactos: el registro real se sustituye por dobles (override de dependencia).

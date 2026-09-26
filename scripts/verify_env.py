@@ -1,8 +1,8 @@
-"""Verificación del entorno: los artefactos de DT-1 cargan y predicen.
+"""Verificación del entorno: los artefactos servidos (DT-4 por defecto) cargan y predicen.
 
 Criterio de éxito del entorno reproducible. Comprueba, en este orden:
 
-1. Las versiones instaladas coinciden con `entorno` del manifiesto de DT-1
+1. Las versiones instaladas coinciden con `entorno` del manifiesto
    (perfil «entorno» de src/artefactos.py: Python por major.minor; sklearn,
    numpy, pandas, joblib y xgboost exactos). Un .pkl de scikit-learn cargado
    con otra versión puede fallar en silencio.
@@ -17,7 +17,8 @@ Criterio de éxito del entorno reproducible. Comprueba, en este orden:
 Los pasos 1-4 son los mismos que ejecuta la API al arrancar (src/artefactos.py).
 
 Uso (desde la raíz del repositorio):
-    python -m scripts.verify_env
+    python -m scripts.verify_env                                     # DT-4 (servido)
+    python -m scripts.verify_env --manifest models/dt1_manifest.json # registro de DT-1
 
 Salida: código 0 si todo pasa, 1 en el primer fallo.
 
@@ -27,6 +28,7 @@ herramienta clínica. Ninguna salida aquí es un diagnóstico médico.
 
 from __future__ import annotations
 
+import argparse
 import json
 import sys
 from pathlib import Path
@@ -38,7 +40,7 @@ from src.cardio_features import bmi
 
 ROOT = Path(__file__).resolve().parents[1]
 MODEL_DIR = ROOT / "models"
-MANIFEST_PATH = MODEL_DIR / "dt1_manifest.json"
+MANIFEST_PATH = MODEL_DIR / "dt4_manifest.json"
 
 # Perfiles de prueba en el orden de features de cada experimento. Valores
 # plausibles, no reales: sirven para ejercitar el grafo de inferencia.
@@ -118,13 +120,18 @@ def verificar_experimento(exp: dict) -> None:
     print(f"  ✓ control de monotonía: alto > bajo (Δ = {proba[1] - proba[0]:+.4f})\n")
 
 
-def main() -> None:
-    if not MANIFEST_PATH.exists():
-        fallo(f"no existe {MANIFEST_PATH.relative_to(ROOT)}")
-    manifiesto = json.loads(MANIFEST_PATH.read_text())
+def main(argv: list[str] | None = None) -> None:
+    ap = argparse.ArgumentParser(description="Compuerta del entorno y de los artefactos de un manifiesto.")
+    ap.add_argument(
+        "--manifest", type=Path, default=MANIFEST_PATH, help="por defecto models/dt4_manifest.json"
+    )
+    ruta = ap.parse_args(argv).manifest
+    if not ruta.exists():
+        fallo(f"no existe {ruta}")
+    manifiesto = json.loads(ruta.read_text())
 
     print("=" * 78)
-    print("VERIFICACIÓN DEL ENTORNO — artefactos de DT-1")
+    print(f"VERIFICACIÓN DEL ENTORNO — artefactos de {manifiesto.get('hito', '?')} ({ruta.name})")
     print("=" * 78 + "\n")
 
     bloques = list(experimentos(manifiesto).values())

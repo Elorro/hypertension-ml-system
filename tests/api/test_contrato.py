@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import tomllib
 from pathlib import Path
 from typing import Any
@@ -13,7 +14,7 @@ from api.schemas import CODIFICACION_GENDER_MANIFIESTO, MAX_FILAS_LOTE
 from src.artefactos import ArtefactoInvalido
 from src.cardio_features import bmi
 from tests.api.conftest import BASE_OK, PA_OK
-from tests.conftest import ROOT
+from tests.conftest import MANIFEST_PATH, ROOT
 
 A = "/v1/riesgo-cardiovascular"
 B1 = "/v1/hipertension-sin-pa"
@@ -79,6 +80,14 @@ def test_contrato_sintetico_eliminado(client):
         assert "modelo_" not in texto and "mejor_modelo" not in texto, archivo
 
 
+def test_nota_de_metricas_segun_el_manifiesto_servido():
+    from api.servicio import nota_metricas
+
+    dt1 = json.loads(MANIFEST_PATH.read_text())
+    assert "sesgadas al alza" in nota_metricas(dt1)  # sigue siendo cierto de DT-1
+    assert "sesgadas al alza" not in nota_metricas({"hito": "DT-4"})
+
+
 def test_modelos_metadatos(client, manifiesto):
     body = client.get("/v1/modelos").json()
     assert body["max_filas_lote"] == MAX_FILAS_LOTE
@@ -89,11 +98,19 @@ def test_modelos_metadatos(client, manifiesto):
     a, b1 = por_exp["riesgo_cv_con_pa"], por_exp["hta_b1"]
     assert a["devuelve_clase"] is True and a["umbral_clase"] == 0.5 and a["advertencia"] is None
     assert b1["devuelve_clase"] is False and b1["umbral_clase"] is None
-    cm = manifiesto["experimentos"]["B1_experimento"]["principal"]["modelos"]["RandomForest"][
-        "confusion_matrix"
-    ]
+    cm = manifiesto["experimentos"]["B1_experimento"]["principal"]["test"]["confusion_matrix"]
     assert str(cm["fn"]) in b1["advertencia"] and str(cm["tp"]) in b1["advertencia"]
-    assert "ranking" in b1["advertencia"]
+    assert "ranking" in b1["advertencia"] and "ganador" not in b1["advertencia"]
+
+    # DT-4: la selección se describe tal como se hizo, y el test no intervino.
+    for m in (a, b1):
+        assert m["seleccion"]["test_intervino_en_la_seleccion"] is False
+        assert "log-loss" in m["seleccion"]["criterio"] and "1 EE" in m["seleccion"]["criterio"]
+    b1_manif = manifiesto["experimentos"]["B1_experimento"]["principal"]
+    assert b1["seleccion"]["candidato"] == b1_manif["candidato_seleccionado"]
+    nota = body["nota_metricas"]
+    assert "eligió al ganador" not in nota and "DT-4 abierto" not in nota and "macro" not in nota
+    assert "una sola vez" in nota and "ya se había observado en DT-1" in nota
 
     # Entrada en unidades humanas: sin bmi, sin age en días; B1 sin presión.
     assert "bmi" not in a["entrada"]["campos"] and "age" not in a["entrada"]["campos"]
@@ -108,8 +125,10 @@ def test_modelos_metadatos(client, manifiesto):
         assert len(met["roc_auc_ic95_bootstrap"]) == 2
 
 
-def test_gender_cita_el_manifiesto(client, manifiesto):
-    assert manifiesto["dataset"]["codificacion_gender"] == CODIFICACION_GENDER_MANIFIESTO
+def test_gender_cita_el_manifiesto(client):
+    # La inferencia 2 = hombre está registrada en el manifiesto de DT-1 (mismo dataset).
+    dt1 = json.loads(MANIFEST_PATH.read_text())
+    assert dt1["dataset"]["codificacion_gender"] == CODIFICACION_GENDER_MANIFIESTO
     desc = client.get("/openapi.json").json()["components"]["schemas"]["EntradaRiesgoCV"]["properties"]
     assert CODIFICACION_GENDER_MANIFIESTO in desc["gender"]["description"]
     assert "inferida" in desc["gender"]["description"]

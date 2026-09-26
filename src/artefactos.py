@@ -1,4 +1,4 @@
-"""Verificación y carga de los artefactos de DT-1 contra su manifiesto.
+"""Verificación y carga de los artefactos de DT-1 o DT-4 contra su manifiesto.
 
 Lo usan ``scripts/verify_env.py`` (perfil ``entorno``) y la API al arrancar
 (perfil ``servicio``). Un fallo levanta ``ArtefactoInvalido`` con un mensaje que
@@ -31,8 +31,8 @@ import numpy as np
 
 Perfil = Literal["entorno", "servicio"]
 
-# El manifiesto de DT-1 no registra la versión de joblib. Procedencia de esta
-# referencia: requirements.lock.txt (2026-09-23). Con ella los sha256 de los
+# El manifiesto de DT-1 no registra la versión de joblib (el de DT-4 sí, y se usa esa).
+# Procedencia de esta referencia para DT-1: requirements.lock.txt (2026-09-23). Con ella los sha256 de los
 # artefactos coinciden con los de la corrida y cargan sin warnings de versión.
 # No está demostrado que sea la versión con la que se serializaron.
 JOBLIB_REFERENCIA: str = "1.6.0"
@@ -127,7 +127,7 @@ def comparar_versiones(manifiesto: dict[str, Any], perfil: Perfil, ganadores: li
 
     filas = [Comparacion("python", _major_minor(entorno["python"]), _major_minor(platform.python_version()))]
     for paquete in exigidos:
-        esperado = JOBLIB_REFERENCIA if paquete == "joblib" else entorno[paquete]
+        esperado = entorno.get("joblib", JOBLIB_REFERENCIA) if paquete == "joblib" else entorno[paquete]
         filas.append(Comparacion(paquete, esperado, _instalada(DISTRIBUCIONES[paquete])))
     return filas
 
