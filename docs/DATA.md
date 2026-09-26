@@ -147,7 +147,8 @@ MIT. No contiene datos de personas reales.
 original en la plataforma. ⚠️ **Su licencia es desconocida para este repositorio.**
 El CSV estuvo versionado; al detectarlo se purgó de toda la historia con
 `git filter-repo` y ya no se redistribuye. `.gitignore` ignora `data/real/` completo
-desde `4b3b5d4` para que no se vuelva a añadir. Se descarga de la fuente:
+desde `4b3b5d4` para que no se vuelva a añadir. Se descarga de la fuente (fuente,
+sha256 esperado y verificación en [data/README.md](../data/README.md)):
 
 ```bash
 # Requiere credenciales de Kaggle en ~/.kaggle/kaggle.json
