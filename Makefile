@@ -1,4 +1,4 @@
-.PHONY: help venv install install-dev data train train-real train-dt4 setup api dashboard serve-api serve-dashboard audit audit-real verify-env verify-env-dt1 test lint format clean
+.PHONY: help venv install install-dev data train train-real train-dt4 setup api dashboard serve-api serve-dashboard audit audit-real fetch-models verify-env verify-env-dt1 test lint format clean
 
 PYTHON   := python
 # Intérprete base de la corrida de referencia de DT-1 (Python 3.14.6).
@@ -54,6 +54,9 @@ audit:  ## Auditoría de target leakage del dataset sintético
 
 audit-real:  ## Criterio de aceptación de DT-1 sobre el dataset real
 	$(PYTHON) scripts/audit_cardio_leakage.py
+
+fetch-models:  ## Descarga los .pkl servidos del release (MODELS_BASE_URL) y verifica su sha256
+	$(PYTHON) -m scripts.fetch_models
 
 verify-env:  ## Compuerta del entorno: versiones + sha256 + carga y predicción de los .pkl servidos (DT-4)
 	$(PYTHON) -m scripts.verify_env
