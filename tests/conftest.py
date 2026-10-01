@@ -18,13 +18,16 @@ ROOT = Path(__file__).resolve().parents[1]
 MANIFEST_PATH = ROOT / "models" / "dt1_manifest.json"  # registro de DT-1
 MANIFEST_DT4_PATH = ROOT / "models" / "dt4_manifest.json"  # el servido
 DATA_PATH = ROOT / "data" / "real" / "cardio" / "cardio_train.csv"
-ARTEFACTOS = sorted((ROOT / "models").glob("dt4_*.pkl"))  # los que carga la API
+# Los que carga la API y publica el release: modelo y scaler de A′ con PA y de B1.
+ARTEFACTOS = sorted(
+    p for exp in ("riesgo_cv_con_pa", "hta_b1") for p in (ROOT / "models").glob(f"dt4_{exp}__*.pkl")
+)
 
 
 def pytest_collection_modifyitems(config: pytest.Config, items: list[pytest.Item]) -> None:
     motivos = {
         "requires_artifacts": (
-            len(ARTEFACTOS) < 6,
+            len(ARTEFACTOS) < 4,
             "faltan models/dt4_*.pkl (no versionados; `make train-dt4`)",
         ),
         "requires_data": (

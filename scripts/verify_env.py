@@ -35,6 +35,7 @@ from pathlib import Path
 
 import numpy as np
 
+from scripts.fetch_models import EXPERIMENTOS_SERVIDOS
 from src.artefactos import ArtefactoInvalido, cargar_experimento, comparar_versiones, experimentos
 from src.cardio_features import bmi
 
@@ -125,7 +126,13 @@ def main(argv: list[str] | None = None) -> None:
     ap.add_argument(
         "--manifest", type=Path, default=MANIFEST_PATH, help="por defecto models/dt4_manifest.json"
     )
-    ruta = ap.parse_args(argv).manifest
+    ap.add_argument(
+        "--solo-servidos",
+        action="store_true",
+        help="verificar solo los experimentos que sirve la API (los que publica el release)",
+    )
+    args = ap.parse_args(argv)
+    ruta = args.manifest
     if not ruta.exists():
         fallo(f"no existe {ruta}")
     manifiesto = json.loads(ruta.read_text())
@@ -135,6 +142,8 @@ def main(argv: list[str] | None = None) -> None:
     print("=" * 78 + "\n")
 
     bloques = list(experimentos(manifiesto).values())
+    if args.solo_servidos:
+        bloques = [b for b in bloques if b["nombre"] in EXPERIMENTOS_SERVIDOS]
     if not bloques:
         fallo("el manifiesto no declara ningún experimento con artefactos")
     verificar_versiones(manifiesto, [b["ganador"] for b in bloques])

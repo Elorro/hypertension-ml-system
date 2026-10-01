@@ -84,3 +84,38 @@ jobs:
       # saltan y -rs (pyproject) imprime cada skip con su motivo.
       - name: Ejecutar tests
         run: python -m pytest --cov=src --cov=api --cov-report=term-missing
+
+  # Tests de integración con los .pkl servidos, descargados del GitHub Release y
+  # verificados por sha256 contra models/dt4_manifest.json. El CSV no se
+  # redistribuye: los tests requires_data se siguen saltando (con motivo visible).
+  integracion:
+    name: Integración (artefactos del release)
+    runs-on: ubuntu-latest
+    env:
+      MODELS_BASE_URL: https://github.com/Elorro/hypertension-ml-system/releases/download/models-dt4-41572ed
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+          cache: pip
+          cache-dependency-path: requirements.lock.txt
+
+      # La clave es el hash del manifiesto: un reentreno invalida la caché.
+      - uses: actions/cache@v4
+        with:
+          path: models/dt4_*.pkl
+          key: dt4-pkl-${{ hashFiles('models/dt4_manifest.json') }}
+
+      - name: Instalar dependencias
+        run: pip install -r requirements.lock.txt
+
+      - name: Descargar y verificar artefactos (sha256)
+        run: python -m scripts.fetch_models
+
+      - name: Compuerta del entorno (versiones + sha256 + carga y predicción)
+        run: python -m scripts.verify_env --solo-servidos
+
+      - name: Tests de integración
+        run: python -m pytest -m requires_artifacts -rs
