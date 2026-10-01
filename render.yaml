@@ -1,0 +1,20 @@
+# Render: SOLO la API (el dashboard va a Streamlit Community Cloud).
+# Los .pkl no están en git: el build los baja del GitHub Release y verifica su
+# sha256 contra models/dt4_manifest.json (scripts/fetch_models.py). Si faltan o no
+# coinciden, el build falla; si faltaran en runtime, la API no arranca y el
+# health check falla: nunca se sirve un modelo que no sea el del manifiesto.
+services:
+  - type: web
+    name: hta-api
+    runtime: python
+    plan: free
+    buildCommand: pip install -r requirements-serve.txt && python -m scripts.fetch_models
+    # Idéntico a `make serve-api HOST=0.0.0.0 PORT=$PORT` (api.main:app es un objeto
+    # de módulo, app = create_app(); no hace falta --factory).
+    startCommand: uvicorn api.main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /health
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.14.6
+      - key: MODELS_BASE_URL
+        value: https://github.com/Elorro/hypertension-ml-system/releases/download/models-dt4-41572ed

@@ -1,0 +1,8 @@
+# Streamlit Community Cloud: dependencias del dashboard.
+# Community Cloud busca primero en el directorio del entrypoint (app/) y este
+# archivo tiene prioridad sobre requirements.txt y pyproject.toml de la raíz.
+# Copia de requirements-dashboard.txt (un test verifica que coinciden).
+
+streamlit==1.64.0
+requests==2.34.2          # cliente HTTP de la API
+pandas==2.3.3             # se importa directamente para el lote por CSV
