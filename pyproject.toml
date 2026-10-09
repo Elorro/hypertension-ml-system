@@ -49,7 +49,7 @@ indent-style = "space"
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 python_files = ["test_*.py"]
-pythonpath = ["."]
+pythonpath = [".", "app"]
 # -rs: el motivo de cada skip (artefactos o CSV ausentes) queda visible en la salida.
 addopts = "-v -rs --strict-markers"
 markers = [

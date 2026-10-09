@@ -45,7 +45,17 @@ def test_solo_importa_cliente_http():
         if isinstance(n, ast.Import | ast.ImportFrom)
         for a in (n.names if isinstance(n, ast.Import) else [n])
     }
-    assert modulos <= {"__future__", "io", "os", "time", "typing", "pandas", "requests", "streamlit"}
+    assert modulos <= {
+        "__future__",
+        "explicacion",
+        "io",
+        "os",
+        "time",
+        "typing",
+        "pandas",
+        "requests",
+        "streamlit",
+    }
 
 
 def test_limites_y_etiquetas_vienen_de_v1_modelos(app_test, client):
@@ -56,7 +66,8 @@ def test_limites_y_etiquetas_vienen_de_v1_modelos(app_test, client):
             if "enum" in spec:
                 w = app_test.selectbox(key=f"{prefijo}_{nombre}")
                 assert w.label == spec["title"]
-                assert w.options == [f"{v} — {spec['x-etiquetas'][str(v)]}" for v in spec["enum"]]
+                etiquetas = [spec["x-etiquetas"][str(v)].removesuffix(" (inferido)") for v in spec["enum"]]
+                assert w.options == etiquetas
             else:
                 w = app_test.number_input(key=f"{prefijo}_{nombre}")
                 assert (w.label, w.min, w.max) == (spec["title"], spec["minimum"], spec["maximum"])
@@ -65,8 +76,17 @@ def test_limites_y_etiquetas_vienen_de_v1_modelos(app_test, client):
 
 
 def test_gender_aclara_que_es_inferido(app_test):
-    assert all("inferido" in o for o in app_test.selectbox(key="a_gender").options)
-    assert any("La correspondencia es inferida" in c.value for c in app_test.caption)
+    assert all(
+        "inferido" not in o and not any(str(c) in o for c in (1, 2))
+        for o in app_test.selectbox(key="a_gender").options
+    )
+    assert any(
+        c.value == "La correspondencia con mujer/hombre es inferida; la fuente del dataset no la documenta."
+        for c in app_test.caption
+    )
+    assert app_test.selectbox(key="a_gender").help == (
+        "La correspondencia con mujer/hombre es inferida; la fuente del dataset no la documenta."
+    )
 
 
 def test_a_prima_muestra_probabilidad_y_clase(app_test):

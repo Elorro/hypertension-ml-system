@@ -27,6 +27,7 @@ from typing import Any
 import pandas as pd
 import requests
 import streamlit as st
+from explicacion import explicar_probabilidad
 
 API_URL: str = os.environ.get("API_URL", "http://127.0.0.1:8000").rstrip("/")
 ESPERA_MAX_S: float = float(os.environ.get("API_WAIT_SECONDS", "75"))
@@ -39,6 +40,7 @@ AVISO_LOCAL: str = (
     "página es un diagnóstico ni sustituye la medición de la presión arterial ni la valoración "
     "de un profesional de salud."
 )
+AYUDA_GENERO = "La correspondencia con mujer/hombre es inferida; la fuente del dataset no la documenta."
 
 
 # =======================================================
@@ -131,19 +133,27 @@ def formulario(modelo: dict[str, Any], prefijo: str) -> dict[str, Any]:
                     titulo,
                     opciones,
                     index=opciones.index(ejemplo) if ejemplo in opciones else 0,
-                    format_func=lambda v, et=etiquetas: f"{v} — {et[str(v)]}" if str(v) in et else str(v),
-                    help=spec.get("description"),
+                    format_func=lambda v, et=etiquetas: (
+                        et[str(v)].removesuffix(" (inferido)") if str(v) in et else str(v)
+                    ),
+                    help=AYUDA_GENERO if nombre == "gender" else spec.get("description"),
                     key=f"{prefijo}_{nombre}",
                 )
                 if any("inferid" in e for e in etiquetas.values()):
-                    st.caption(spec.get("description", ""))
+                    st.caption(AYUDA_GENERO)
             else:
+                entero = nombre in {"age_years", "height", "ap_hi", "ap_lo"}
                 valores[nombre] = st.number_input(
                     titulo,
-                    min_value=float(spec["minimum"]),
-                    max_value=float(spec["maximum"]),
-                    value=float(ejemplo if ejemplo is not None else spec["minimum"]),
-                    step=1.0,
+                    min_value=int(spec["minimum"]) if entero else float(spec["minimum"]),
+                    max_value=int(spec["maximum"]) if entero else float(spec["maximum"]),
+                    value=(
+                        int(ejemplo if ejemplo is not None else spec["minimum"])
+                        if entero
+                        else float(ejemplo if ejemplo is not None else spec["minimum"])
+                    ),
+                    step=1 if entero else 0.1 if nombre == "weight" else 1.0,
+                    format="%d" if entero else "%.1f" if nombre == "weight" else "%.2f",
                     help=spec.get("description"),
                     key=f"{prefijo}_{nombre}",
                 )
@@ -163,6 +173,7 @@ def mostrar_resultado(resultado: dict[str, Any]) -> None:
     )
     c2.metric("Prevalencia base (train)", _pct(base))
     st.progress(min(max(p, 0.0), 1.0))
+    st.write(explicar_probabilidad(p, base, resultado["modelo"]["experimento"]))
     if "clase" in resultado:
         st.write(
             f"Clase con umbral {_dec(resultado['umbral'], 1)} explícito: **{resultado['clase']}** "
