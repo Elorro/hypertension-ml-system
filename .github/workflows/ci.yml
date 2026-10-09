@@ -9,7 +9,7 @@ on:
 jobs:
   lint:
     name: Lint
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
 
@@ -30,7 +30,7 @@ jobs:
 
   pipeline:
     name: Pipeline end-to-end
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
 
@@ -67,7 +67,7 @@ jobs:
 
   test:
     name: Tests
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
 
@@ -90,7 +90,7 @@ jobs:
   # redistribuye: los tests requires_data se siguen saltando (con motivo visible).
   integracion:
     name: Integración (artefactos del release)
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     env:
       MODELS_BASE_URL: https://github.com/Elorro/hypertension-ml-system/releases/download/models-dt4-41572ed
     steps:
