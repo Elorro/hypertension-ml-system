@@ -80,12 +80,15 @@ consejo médico ni sustituye la valoración de un profesional de la salud.
  data/real/cardio/cardio_train.csv          src/cardio_features.py
                │                          (features, derivación, cotas)
                ▼                                 │          │
- src/train_cardio_real.py ◄──────────────────────┘          │
+ src/train_cardio_dt4.py  ◄──────────────────────┘          │
                │                                            │
                ▼                                            ▼
- models/dt1_*.pkl + dt1_manifest.json ──► api/main.py (FastAPI) ◄── HTTP ── app/dashboard.py
+ models/dt4_*.pkl + dt4_manifest.json ──► api/main.py (FastAPI) ◄── HTTP ── app/dashboard.py
                                            verifica versiones y         (Streamlit, cliente
                                            sha256 al arrancar            HTTP puro)
+
+ Registro de DT-1 (no se sirve):
+ src/train_cardio_real.py ──► models/dt1_*.pkl + dt1_manifest.json
 
  Evidencia del leakage, fuera del servicio:
  src/generate_dataset.py ──► src/train_classical_models.py ──► models/modelo_*.pkl
@@ -102,7 +105,7 @@ Descripción detallada de módulos, contratos y flujo de datos en
 
 ## Instalación
 
-Requiere Python 3.14 (referencia: 3.14.6). Los `.pkl` de DT-1 son objetos serializados
+Requiere Python 3.14 (referencia: 3.14.6). Los `.pkl` son objetos serializados
 de scikit-learn, así que el entorno se instala desde el lock, con versiones exactas.
 
 ```bash
@@ -120,12 +123,15 @@ Instalaciones mínimas: `requirements-serve.txt` (solo la API, sin pandas ni xgb
 
 ## Uso rápido
 
-Los artefactos entrenados (`models/*.pkl`) y el dataset real **no se versionan**. Con
-`data/real/cardio/cardio_train.csv` descargado (ver [docs/DATA.md](docs/DATA.md)):
+Los artefactos entrenados (`models/*.pkl`) y el dataset real **no se versionan**. Los
+cuatro `.pkl` que sirve la API (modelo y scaler de A′ y de B1) están publicados como
+assets de un GitHub Release: **servirlos no requiere el CSV**. `fetch-models` los
+descarga y verifica su sha256 contra `models/dt4_manifest.json`:
 
 ```bash
-make train-real       # entrena DT-1 y genera models/dt1_*.pkl (~51 min)
-make verify-env       # versiones + sha256 + carga y predicción de los .pkl
+export MODELS_BASE_URL=https://github.com/Elorro/hypertension-ml-system/releases/download/models-dt4-41572ed
+make fetch-models     # descarga y verifica el sha256 de los 4 .pkl servidos
+python -m scripts.verify_env --solo-servidos   # versiones + sha256 + carga y predicción
 make serve-api        # servicio en http://127.0.0.1:8000  (docs en /docs)
 make serve-dashboard  # dashboard en http://localhost:8501 (API_URL, por defecto :8000)
 ```
@@ -133,13 +139,20 @@ make serve-dashboard  # dashboard en http://localhost:8501 (API_URL, por defecto
 Sin `make`:
 
 ```bash
-python -m src.train_cardio_real
+export MODELS_BASE_URL=https://github.com/Elorro/hypertension-ml-system/releases/download/models-dt4-41572ed
+python -m scripts.fetch_models
+python -m scripts.verify_env --solo-servidos
 uvicorn api.main:app --host 127.0.0.1 --port 8000
 API_URL=http://127.0.0.1:8000 streamlit run app/dashboard.py
 ```
 
+> `make verify-env` (sin `--solo-servidos`) verifica además el experimento `cv_sin_pa`,
+> que no se publica: solo pasa tras reentrenar localmente. Para reproducir el
+> entrenamiento (requiere el CSV), ver [docs/DATA.md](docs/DATA.md) y
+> [docs/DT4_RESULTS.md](docs/DT4_RESULTS.md).
+
 > El servicio carga los modelos una vez al arrancar, tras verificar versiones y sha256
-> contra `models/dt1_manifest.json`. Si falta un `.pkl` o no coincide, **no arranca**.
+> contra `models/dt4_manifest.json`. Si falta un `.pkl` o no coincide, **no arranca**.
 
 ### Ejemplo de inferencia
 
@@ -235,25 +248,33 @@ hypertension-ml-system/
 │   ├── main.py                   # Servicio FastAPI: endpoints y carga en lifespan
 │   ├── schemas.py                # Esquemas Pydantic (entrada en unidades humanas)
 │   └── servicio.py               # Registro de modelos y matriz de features
-├── app/dashboard.py              # Dashboard Streamlit (cliente HTTP del servicio)
+├── app/
+│   ├── dashboard.py              # Dashboard Streamlit (cliente HTTP del servicio)
+│   └── explicacion.py            # Texto que explica la probabilidad (sin Streamlit)
 ├── src/
 │   ├── cardio_features.py        # Fuente única: features, derivación y cotas de DT-1
 │   ├── artefactos.py             # Verificación de versiones y sha256 de los .pkl
-│   ├── train_cardio_real.py      # DT-1: entrenamiento sobre datos reales
+│   ├── train_cardio_dt4.py       # DT-4: CV, regla de 1 EE y una evaluación en test (lo que sirve la API)
+│   ├── train_cardio_real.py      # DT-1: registro del entrenamiento sobre datos reales (no se sirve)
 │   ├── generate_dataset.py       # Generador sintético (evidencia del leakage)
 │   └── train_classical_models.py # Entrenamiento sintético (evidencia; no se sirve)
 ├── scripts/
+│   ├── fetch_models.py           # Descarga y verifica los .pkl del release (make fetch-models)
 │   ├── verify_env.py             # Compuerta del entorno (make verify-env)
 │   ├── verify_leakage.py         # Auditoría del leakage del dataset sintético
 │   └── audit_cardio_leakage.py   # Criterio de aceptación de DT-1 (datos reales)
-├── tests/                        # Contrato (en CI) e integración (se saltan sin .pkl/CSV)
+├── tests/                        # Contrato e integración (en CI con los .pkl del release); lo que exige el CSV, solo en local
 ├── notebooks/
 │   └── EDA_cardiovascular_real.ipynb  # EDA sobre datos reales de Kaggle
 ├── data/
 │   ├── raw/                      # Dataset sintético generado (no versionado)
 │   └── real/cardio/              # Dataset Kaggle (no versionado; se descarga de la fuente)
 ├── models/                       # Artefactos entrenados (.pkl no versionados)
+│   ├── dt4_manifest.json         # Manifiesto de DT-4: lo que sirve la API (sí versionado)
 │   └── dt1_manifest.json         # Evidencia de la corrida DT-1 (sí versionado)
+├── deploy/release.sh             # Publica los .pkl servidos como assets de un GitHub Release
+├── render.yaml                   # Configuración de Render para la API (todavía sin desplegar)
+├── .github/workflows/ci.yml      # CI: lint, tests, integración con el release y pipeline
 ├── docs/                         # Documentación técnica
 └── [scripts de la raíz]          # Pipeline heredado — ver ROADMAP
 ```
@@ -291,12 +312,25 @@ validación estadística (DT-1 a DT-4) cerrada.**
   había observado en DT-1.
 - ✅ **Servicio migrado** (`6e59035`, `a7bf9ef`): la API y el dashboard sirven solo A′ y
   B1 de DT-4. Sigue abierta la otra mitad de DT-5: el pipeline heredado de la raíz.
-- 🟡 **DT-6 parcial**: 108 tests (los de contrato corren en CI; los de integración se
-  saltan sin `.pkl` ni CSV). Cobertura de `src/` + `api/`: 72 % en local, 65 % en CI,
-  donde se aplica el criterio del 70 %.
+- 🟡 **DT-6 parcial**: 125 tests. En CI, 110 corren en el job Tests y 6 más (integración
+  con los `.pkl` del release) en el job Integración; 9 requieren el CSV, no
+  redistribuible, y solo corren en local. Cobertura de `src/` + `api/`: 72 % en local,
+  65 % en CI. El criterio del 70 % no está automatizado: ningún paso del CI lo exige.
 - No hay despliegue público: el servicio corre en local.
 
 Ver [docs/ROADMAP.md](docs/ROADMAP.md) y [BITACORA.md](BITACORA.md).
+
+## Uso de herramientas de IA
+
+Este proyecto se desarrolló con asistencia de herramientas de IA: Claude (Anthropic), en
+chat y con Claude Code, para el diseño, la revisión y parte de la implementación, y Codex
+(OpenAI) para los cambios de presentación del dashboard. Las decisiones de diseño
+(protocolo preregistrado, criterios de aceptación, umbrales) y la revisión de cada
+cambio antes de commitear son del autor. Las cifras de este repositorio salen de
+ejecuciones reproducibles, con manifiestos y sha256 (`models/dt4_manifest.json`), no de
+texto generado. Los commits no llevan trailers de coautoría; el uso de IA se declara aquí.
+
+---
 
 ## Licencia
 
