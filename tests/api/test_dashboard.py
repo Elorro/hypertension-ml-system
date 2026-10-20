@@ -75,6 +75,19 @@ def test_limites_y_etiquetas_vienen_de_v1_modelos(app_test, client):
     assert app_test.number_input(key="a_age_years").max == 65.0
 
 
+def test_rango_de_edad_visible_y_en_ayuda_en_cada_formulario(app_test, client):
+    catalogo = {m["experimento"]: m for m in client.get("/v1/modelos").json()["modelos"]}
+    for prefijo, exp in (("a", "riesgo_cv_con_pa"), ("b1", "hta_b1")):
+        spec = catalogo[exp]["entrada"]["campos"]["age_years"]
+        esperado = (
+            f"Rango admitido: {int(spec['minimum'])} a {int(spec['maximum'])} años, "
+            "el de los datos con los que se entrenó el modelo. Fuera de él no hay datos "
+            "y no se calcula una estimación."
+        )
+        assert any(c.value == esperado for c in app_test.caption)
+        assert app_test.number_input(key=f"{prefijo}_age_years").help == esperado
+
+
 def test_gender_aclara_que_es_inferido(app_test):
     assert all(
         "inferido" not in o and not any(str(c) in o for c in (1, 2))

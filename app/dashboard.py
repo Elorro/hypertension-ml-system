@@ -143,6 +143,15 @@ def formulario(modelo: dict[str, Any], prefijo: str) -> dict[str, Any]:
                     st.caption(AYUDA_GENERO)
             else:
                 entero = nombre in {"age_years", "height", "ap_hi", "ap_lo"}
+                ayuda_edad = (
+                    (
+                        f"Rango admitido: {int(spec['minimum'])} a {int(spec['maximum'])} años, "
+                        "el de los datos con los que se entrenó el modelo. Fuera de él no hay "
+                        "datos y no se calcula una estimación."
+                    )
+                    if nombre == "age_years"
+                    else None
+                )
                 valores[nombre] = st.number_input(
                     titulo,
                     min_value=int(spec["minimum"]) if entero else float(spec["minimum"]),
@@ -154,9 +163,11 @@ def formulario(modelo: dict[str, Any], prefijo: str) -> dict[str, Any]:
                     ),
                     step=1 if entero else 0.1 if nombre == "weight" else 1.0,
                     format="%d" if entero else "%.1f" if nombre == "weight" else "%.2f",
-                    help=spec.get("description"),
+                    help=ayuda_edad if nombre == "age_years" else spec.get("description"),
                     key=f"{prefijo}_{nombre}",
                 )
+                if nombre == "age_years":
+                    st.caption(ayuda_edad)
     for derivada, regla in modelo.get("derivadas_en_servidor", {}).items():
         st.caption(f"`{derivada}` se calcula en el servidor: {regla}.")
     return valores
