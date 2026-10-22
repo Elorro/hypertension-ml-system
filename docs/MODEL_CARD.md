@@ -153,7 +153,7 @@ sensibles de salud (en Colombia, Ley 1581 de 2012 y sus decretos reglamentarios)
    observado en DT-1.
 3. **Antes de cualquier uso serio:** análisis de equidad (DT-15), validación externa y
    un test no observado previamente.
-4. **No hay despliegue público.** El servicio corre en local; RSS medido de la API con
+4. **Despliegue público de demostración (planes gratuitos), sin autenticación.** API en Render y dashboard en Streamlit Community Cloud; RSS medido en local de la API con
    los dos modelos: 202 MiB.
 
 ---

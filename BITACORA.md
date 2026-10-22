@@ -8,6 +8,36 @@ Formato: entradas descendentes (lo más reciente arriba).
 
 ---
 
+## 2026-10-22 — Despliegue público: API en Render y dashboard en Streamlit Community Cloud
+
+**Fase:** despliegue (posterior al prototipo validado; DT-1, DT-3 y DT-4 cerrados)
+
+- **API:** https://hta-api.onrender.com. Render, plan Free sin tarjeta, Blueprint desde
+  `render.yaml`, Python 3.14.6. El build descarga los `.pkl` del release
+  `models-dt4-41572ed` y verifica su sha256. Verificado: `/health`, ambos endpoints y
+  mismas probabilidades que en local (A′ 0,5133575026752739).
+- **Dashboard:** https://hypertensionmlsystem.streamlit.app/ (Streamlit Community Cloud,
+  rama `main`, `app/dashboard.py`). `API_URL` y `API_WAIT_SECONDS` van en Secrets, no en
+  el repo.
+- **Auto-Deploy de Render:** activo. Un push a `main` redespliega (último evento
+  observado: «Deploy live for 736dd45», 2026-10-20).
+- **CI:** verde en los últimos tres runs.
+- **Documentación:** se retira la afirmación «no hay despliegue público» de README,
+  `docs/API.md`, `docs/MODEL_CARD.md`, `docs/ARCHITECTURE.md`, `docs/DT4_RESULTS.md` y
+  `CLAUDE.md`; el ejemplo de inferencia del README pasa de 0.5173 a 0.5134.
+
+### Pendiente
+
+- Medir el cold start de Render (el «50 s o más» de los textos es el aviso del panel, no
+  una medición) y ajustar `API_WAIT_SECONDS`.
+- El panel lateral del dashboard muestra la URL de la API y versión/sha256 de los
+  modelos; valorar moverlo a un expander de detalles técnicos.
+- Sin autenticación ni rate limiting en un endpoint público (ROADMAP).
+- `PORTFOLIO.md` sigue en cifras de DT-1: rehacerlo con las de DT-4.
+- Análisis de equidad (DT-15) y validación externa siguen abiertos.
+
+---
+
 ## 2026-09-26 — DT-3 y DT-4 cerrados: selección preregistrada por validación cruzada
 
 **Fase:** 2 (validación matemática) — **compuerta superada**; el servicio pasa a DT-4

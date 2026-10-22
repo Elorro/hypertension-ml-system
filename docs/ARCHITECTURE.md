@@ -214,8 +214,7 @@ El repositorio versiona el *código que los produce* y los manifiestos
 (`models/dt1_manifest.json`, `models/dt4_manifest.json`), con el sha256 de cada
 artefacto; la reproducibilidad se apoya en la semilla fija y en el entorno fijado por
 `requirements.lock.txt`. El costo es que un clon limpio requiere `make train-dt4`
-(≈ 7 min) antes de arrancar el servicio. No hay despliegue: cómo llevar los `.pkl` a un
-entorno sin disco persistente sigue sin decidir.
+(≈ 7 min) antes de arrancar el servicio. En el despliegue de Render, el build descarga los `.pkl` del release de GitHub y verifica su sha256 (`render.yaml`).
 
 **Por qué se persiste el scaler junto a los modelos.** El escalado forma parte de la
 función de inferencia, no del entrenamiento. Reajustarlo en producción produciría

@@ -128,8 +128,7 @@ aporte de la presión no depende del cambio de hiperparámetros.
 ## 6. Recursos del servicio
 
 Medido en local con un venv solo con `requirements-serve.txt`: RSS de la API con A′ + B1
-cargados, **352 → 202 MiB**; `.pkl` servidos (A′ + B1), **130 → 32 MB**. No hay
-despliegue público.
+cargados, **352 → 202 MiB**; `.pkl` servidos (A′ + B1), **130 → 32 MB**. El despliegue posterior (Render + Streamlit) se describe en el README.
 
 ## 7. Reproducibilidad
 

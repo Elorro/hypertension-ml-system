@@ -30,8 +30,10 @@ clínica. Ver la sección de estado antes de proponer cualquier trabajo.
 Cualquier cambio de modelo o de hiperparámetros exige un **protocolo preregistrado
 nuevo** (como `docs/DT4_PROTOCOL.md`), commiteado antes de entrenar; nunca seleccionar
 mirando el test. El test de DT-4 ya se había observado en DT-1 (limitación declarada).
-No hay despliegue público; plataforma y manejo de los `.pkl` en deploy están sin
-decidir (servidos: 32 MB; RSS de la API: 202 MiB).
+Despliegue público en planes gratuitos: API en Render (https://hta-api.onrender.com)
+y dashboard en Streamlit Community Cloud (https://hypertensionmlsystem.streamlit.app/);
+el build de Render descarga los `.pkl` del release y verifica el sha256
+(servidos: 32 MB; RSS de la API: 202 MiB).
 
 ## El defecto que dominaba todo lo demás — cerrado en entrenamiento (2026-09-17) y en el servicio (2026-09-23)
 

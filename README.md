@@ -6,6 +6,8 @@ Sistema end-to-end de machine learning sobre el dataset real *Cardiovascular Dis
 presión, y dashboard interactivo. Conserva, como evidencia reproducible, el pipeline
 sintético original y su target leakage.
 
+**Demo en vivo:** [dashboard](https://hypertensionmlsystem.streamlit.app/) · API en https://hta-api.onrender.com (plan gratuito: el primer acceso puede tardar 50 s o más mientras la API despierta).
+
 ![Python](https://img.shields.io/badge/python-3.14-blue)
 ![License](https://img.shields.io/badge/license-MIT-green)
 ![Status](https://img.shields.io/badge/status-prototipo%20educativo-orange)
@@ -161,7 +163,7 @@ curl -X POST http://127.0.0.1:8000/v1/riesgo-cardiovascular \
   -H "Content-Type: application/json" \
   -d '{"age_years":52,"gender":1,"height":165,"weight":72,"cholesterol":1,"gluc":1,
        "smoke":0,"alco":0,"active":1,"ap_hi":130,"ap_lo":85}'
-# → {"probabilidad":0.5173…,"prevalencia_base":0.4948…,"modelo":{…},"aviso":"…","clase":1,"umbral":0.5}
+# → {"probabilidad":0.5134…,"prevalencia_base":0.4948…,"modelo":{…},"aviso":"…","clase":1,"umbral":0.5}
 ```
 
 Referencia completa de endpoints y esquemas en **[docs/API.md](docs/API.md)**.
@@ -273,7 +275,7 @@ hypertension-ml-system/
 │   ├── dt4_manifest.json         # Manifiesto de DT-4: lo que sirve la API (sí versionado)
 │   └── dt1_manifest.json         # Evidencia de la corrida DT-1 (sí versionado)
 ├── deploy/release.sh             # Publica los .pkl servidos como assets de un GitHub Release
-├── render.yaml                   # Configuración de Render para la API (todavía sin desplegar)
+├── render.yaml                   # Configuración de Render para la API (desplegada en Render)
 ├── .github/workflows/ci.yml      # CI: lint, tests, integración con el release y pipeline
 ├── docs/                         # Documentación técnica
 └── [scripts de la raíz]          # Pipeline heredado — ver ROADMAP
@@ -316,7 +318,7 @@ validación estadística (DT-1 a DT-4) cerrada.**
   con los `.pkl` del release) en el job Integración; 9 requieren el CSV, no
   redistribuible, y solo corren en local. Cobertura de `src/` + `api/`: 72 % en local,
   65 % en CI. El criterio del 70 % no está automatizado: ningún paso del CI lo exige.
-- No hay despliegue público: el servicio corre en local.
+- Despliegue público (planes gratuitos): API en https://hta-api.onrender.com y dashboard en https://hypertensionmlsystem.streamlit.app/. La instancia de Render se duerme tras un periodo de inactividad y el primer request puede tardar 50 s o más.
 
 Ver [docs/ROADMAP.md](docs/ROADMAP.md) y [BITACORA.md](BITACORA.md).
 

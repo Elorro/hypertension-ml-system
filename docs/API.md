@@ -322,9 +322,9 @@ print(f"P = {r['probabilidad']:.3f}  (prevalencia base {r['prevalencia_base']:.3
 | Limitación | Impacto | Estado |
 |------------|---------|--------|
 | Test ya observado en DT-1 | La selección de DT-4 no lo mira, pero no es un test virgen | limitación declarada, [DT4_PROTOCOL.md](DT4_PROTOCOL.md) |
-| `.pkl` fuera de git (≈ 32 MB servidos) | Un despliegue necesita otra vía para los artefactos | pendiente |
-| Sin autenticación ni rate limiting | Solo apto para uso local | [ROADMAP](ROADMAP.md) |
+| `.pkl` fuera de git (≈ 32 MB servidos) | El build de Render los descarga del release y verifica el sha256 | resuelto (`deploy/release.sh`, `render.yaml`) |
+| Sin autenticación ni rate limiting | Endpoint público sin protección: cualquiera con la URL puede consultarlo | [ROADMAP](ROADMAP.md) |
 | Sin logging estructurado | Solo el log de uvicorn | [ROADMAP](ROADMAP.md) |
 | Validez externa | Un solo dataset, sin análisis de equidad | DT-15, [ROADMAP](ROADMAP.md) |
 
-No existe un despliegue público: el servicio corre en local.
+La API está desplegada en https://hta-api.onrender.com (Render, plan gratuito): se duerme tras un periodo de inactividad y el primer request puede tardar 50 s o más.
