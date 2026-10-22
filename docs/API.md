@@ -327,4 +327,4 @@ print(f"P = {r['probabilidad']:.3f}  (prevalencia base {r['prevalencia_base']:.3
 | Sin logging estructurado | Solo el log de uvicorn | [ROADMAP](ROADMAP.md) |
 | Validez externa | Un solo dataset, sin análisis de equidad | DT-15, [ROADMAP](ROADMAP.md) |
 
-La API está desplegada en https://hta-api.onrender.com (Render, plan gratuito): se duerme tras un periodo de inactividad y el primer request puede tardar 50 s o más.
+La API está desplegada en https://hta-api.onrender.com (Render, plan gratuito): se duerme tras un periodo de inactividad y el primer request posterior tardó 48–63 s en 3 mediciones (2026-10-22).

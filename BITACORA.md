@@ -28,10 +28,12 @@ Formato: entradas descendentes (lo más reciente arriba).
 
 ### Pendiente
 
-- Medir el cold start de Render (el «50 s o más» de los textos es el aviso del panel, no
-  una medición) y ajustar `API_WAIT_SECONDS`.
-- El panel lateral del dashboard muestra la URL de la API y versión/sha256 de los
-  modelos; valorar moverlo a un expander de detalles técnicos.
+- Cold start de Render medido (2026-10-22; 3 muestras tras más de 16 min sin tráfico, POST a
+  `/v1/riesgo-cardiovascular`): 62,9 / 47,8 / 53,2 s; peticiones tibias 0,26–0,59 s.
+  `API_WAIT_SECONDS = 150` se mantiene (2,4× la peor muestra).
+- Panel lateral del dashboard (hecho el 2026-10-22): versión y sha256 de los modelos en un
+  expander «Detalles técnicos»; la URL y el detalle de los errores ya no se muestran en
+  pantalla (mensajes genéricos; la URL va al log del servidor).
 - Sin autenticación ni rate limiting en un endpoint público (ROADMAP).
 - `PORTFOLIO.md` sigue en cifras de DT-1: rehacerlo con las de DT-4.
 - Análisis de equidad (DT-15) y validación externa siguen abiertos.

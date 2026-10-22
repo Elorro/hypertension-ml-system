@@ -6,7 +6,7 @@ Sistema end-to-end de machine learning sobre el dataset real *Cardiovascular Dis
 presión, y dashboard interactivo. Conserva, como evidencia reproducible, el pipeline
 sintético original y su target leakage.
 
-**Demo en vivo:** [dashboard](https://hypertensionmlsystem.streamlit.app/) · API en https://hta-api.onrender.com (plan gratuito: el primer acceso puede tardar 50 s o más mientras la API despierta).
+**Demo en vivo:** [dashboard](https://hypertensionmlsystem.streamlit.app/) · API en https://hta-api.onrender.com (plan gratuito: el primer acceso tras inactividad tardó 48–63 s en 3 mediciones (2026-10-22) mientras la API despierta).
 
 ![Python](https://img.shields.io/badge/python-3.14-blue)
 ![License](https://img.shields.io/badge/license-MIT-green)
@@ -318,7 +318,7 @@ validación estadística (DT-1 a DT-4) cerrada.**
   con los `.pkl` del release) en el job Integración; 9 requieren el CSV, no
   redistribuible, y solo corren en local. Cobertura de `src/` + `api/`: 72 % en local,
   65 % en CI. El criterio del 70 % no está automatizado: ningún paso del CI lo exige.
-- Despliegue público (planes gratuitos): API en https://hta-api.onrender.com y dashboard en https://hypertensionmlsystem.streamlit.app/. La instancia de Render se duerme tras un periodo de inactividad y el primer request puede tardar 50 s o más.
+- Despliegue público (planes gratuitos): API en https://hta-api.onrender.com y dashboard en https://hypertensionmlsystem.streamlit.app/. La instancia de Render se duerme tras un periodo de inactividad y el primer request posterior tardó 48–63 s en 3 mediciones (2026-10-22).
 
 Ver [docs/ROADMAP.md](docs/ROADMAP.md) y [BITACORA.md](BITACORA.md).
 
