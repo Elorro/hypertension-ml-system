@@ -49,6 +49,7 @@ def test_solo_importa_cliente_http():
         "__future__",
         "explicacion",
         "io",
+        "logging",
         "os",
         "time",
         "typing",
@@ -164,7 +165,9 @@ def test_api_caida_mensaje_explicito(monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setattr(requests, "get", caida)
     at = AppTest.from_file(DASHBOARD, default_timeout=30).run()
     assert not at.exception
-    assert any("No se pudo contactar la API" in e.value and "Connection refused" in e.value for e in at.error)
+    textos = " ".join(e.value for e in at.error)
+    assert "No se pudo contactar la API" in textos
+    assert "Connection refused" not in textos and "127.0.0.1" not in textos
     assert [b.label for b in at.button] == ["Reintentar"]
     assert not at.tabs
     assert "no herramienta clínica" in at.markdown[0].value

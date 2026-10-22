@@ -20,6 +20,7 @@ AVISO: demostración de ingeniería de ML, no herramienta clínica.
 from __future__ import annotations
 
 import io
+import logging
 import os
 import time
 from typing import Any
@@ -28,6 +29,8 @@ import pandas as pd
 import requests
 import streamlit as st
 from explicacion import explicar_probabilidad
+
+logger = logging.getLogger(__name__)
 
 API_URL: str = os.environ.get("API_URL", "http://127.0.0.1:8000").rstrip("/")
 ESPERA_MAX_S: float = float(os.environ.get("API_WAIT_SECONDS", "75"))
@@ -81,10 +84,22 @@ def esperar_api() -> tuple[dict[str, Any] | None, str]:
                 ultimo_error = str(exc)
                 restante = limite - time.monotonic()
                 if restante <= 0:
-                    st.write(f"Intento {intento}: sin respuesta de {API_URL}. Sin más reintentos.")
+                    logger.warning(
+                        "API sin respuesta url=%s error_type=%s intento=%d",
+                        API_URL,
+                        type(exc).__name__,
+                        intento,
+                    )
+                    st.write(f"Intento {intento}: sin respuesta de la API. Sin más reintentos.")
                     estado.update(label="La API no respondió", state="error", expanded=False)
                     return None, ultimo_error
-                st.write(f"Intento {intento}: sin respuesta de {API_URL}. Reintentando…")
+                logger.warning(
+                    "API sin respuesta url=%s error_type=%s intento=%d",
+                    API_URL,
+                    type(exc).__name__,
+                    intento,
+                )
+                st.write(f"Intento {intento}: sin respuesta de la API. Reintentando…")
                 time.sleep(min(INTERVALO_S, restante))
 
 
@@ -205,7 +220,8 @@ def predecir_individual(modelo: dict[str, Any], prefijo: str) -> None:
         r = _post(modelo["endpoint"], valores)
     except APINoDisponible as exc:
         st.session_state.pop("health", None)
-        st.error(f"La API dejó de responder en {API_URL}. Recarga la página para reintentar. ({exc})")
+        logger.warning("API dejó de responder url=%s error_type=%s", API_URL, type(exc).__name__)
+        st.error("La API dejó de responder. Recarga la página para reintentar.")
         return
     if r.status_code == 422:
         st.error("La entrada está fuera del dominio de entrenamiento:")
@@ -286,7 +302,8 @@ def seccion_lote(por_exp: dict[str, dict[str, Any]], max_filas: int) -> None:
         resultado = predecir_lote(modelo, df, max_filas)
     except APINoDisponible as exc:
         st.session_state.pop("health", None)
-        st.error(f"La API dejó de responder en {API_URL}. Recarga la página para reintentar. ({exc})")
+        logger.warning("API dejó de responder url=%s error_type=%s", API_URL, type(exc).__name__)
+        st.error("La API dejó de responder. Recarga la página para reintentar.")
         return
     n_err = int((resultado["error"] != "").sum())
     st.write(f"**{len(resultado) - n_err}** filas con probabilidad · **{n_err}** con error")
@@ -333,10 +350,10 @@ def main() -> None:
     if "health" not in st.session_state:
         health, error = esperar_api()
         if health is None:
+            tipo_error = error.partition(":")[0] or "Error"
+            logger.warning("No se pudo contactar la API url=%s error_type=%s", API_URL, tipo_error)
             st.error(
-                f"No se pudo contactar la API en `{API_URL}` tras {ESPERA_MAX_S:.0f} s de reintentos. "
-                "Puede estar apagada, dormida o la URL (variable API_URL) ser incorrecta.\n\n"
-                f"Último error: `{error}`"
+                f"No se pudo contactar la API tras {ESPERA_MAX_S:.0f} s de reintentos. Puede estar dormida: espera un momento y recarga la página."
             )
             st.button("Reintentar")
             st.stop()
@@ -347,13 +364,14 @@ def main() -> None:
         catalogo = catalogo_modelos(API_URL)
     except (APINoDisponible, requests.HTTPError) as exc:
         st.session_state.pop("health", None)
-        st.error(f"No se pudo leer /v1/modelos de `{API_URL}`: {exc}")
+        logger.warning("No se pudo leer el catálogo url=%s error_type=%s", API_URL, type(exc).__name__)
+        st.error("No se pudo leer el catálogo de modelos de la API.")
         st.button("Reintentar")
         st.stop()
     por_exp = {m["experimento"]: m for m in catalogo["modelos"]}
 
-    with st.sidebar:
-        st.markdown(f"**API** `{API_URL}` · versión {health['version_api']}")
+    with st.sidebar, st.expander("Detalles técnicos", expanded=False):
+        st.caption(f"Versión de la API: {health['version_api']}")
         for m in health["modelos"]:
             st.caption(f"{m['experimento']}: {m['algoritmo']} · sha256 {m['sha256'][:12]}…")
 
