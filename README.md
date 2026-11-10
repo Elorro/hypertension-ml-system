@@ -68,7 +68,8 @@ en [docs/DT1_RESULTS.md](docs/DT1_RESULTS.md). El servicio FastAPI y el dashboar
 - EDA sobre un dataset clínico real (70.000 pacientes, Kaggle).
 - Auditoría de leakage con **control positivo**, y una ablación controlada con
   bootstrap pareado que cuantifica cuánto vale medir la presión arterial:
-  Δ AUC = 0,0991 [0,0919 · 0,1061] (DT-4; el 0,1103 de DT-1 estaba inflado por comparar
+  Δ AUC principal = 0,0991 [0,0919 · 0,1061] y comparación práctica = 0,0994
+  [0,0923 · 0,1065] (DT-4; el 0,1103 histórico de DT-1 estaba inflado por comparar
   contra una SVM elegida por macro-F1).
 
 **Aviso médico:** herramienta con fines educativos. No constituye diagnóstico,
