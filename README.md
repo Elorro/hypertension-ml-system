@@ -315,8 +315,9 @@ validación estadística (DT-1 a DT-4) cerrada.**
   había observado en DT-1.
 - ✅ **Servicio migrado** (`6e59035`, `a7bf9ef`): la API y el dashboard sirven solo A′ y
   B1 de DT-4. Sigue abierta la otra mitad de DT-5: el pipeline heredado de la raíz.
-- 🟡 **DT-6 parcial**: 125 tests. En CI, 110 corren en el job Tests y 6 más (integración
-  con los `.pkl` del release) en el job Integración; 9 requieren el CSV, no
+- 🟡 **DT-6 parcial**: 126 tests (medido el 2026-11-13 con `python -m pytest -q`, Python
+  3.14.10, con el CSV y los `.pkl` presentes: 126 passed). En CI, 111 corren en el job
+  Tests y 6 más (integración con los `.pkl` del release) en el job Integración; 9 requieren el CSV, no
   redistribuible, y solo corren en local. Cobertura de `src/` + `api/`: 72 % en local,
   65 % en CI. El criterio del 70 % no está automatizado: ningún paso del CI lo exige.
 - Despliegue público (planes gratuitos): API en https://hta-api.onrender.com y dashboard en https://hypertensionmlsystem.streamlit.app/. La instancia de Render se duerme tras un periodo de inactividad y el primer request posterior tardó 48–63 s en 3 mediciones (2026-10-22).
