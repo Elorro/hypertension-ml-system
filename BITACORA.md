@@ -545,3 +545,24 @@ Sin validación estadística formal en este punto.
 **Fase:** 1 (diseño)
 
 Commit `43c6c6e`. Estructura base del proyecto.
+
+---
+
+## 2026-11-13 — Medición de solicitudes tras inactividad
+
+- **Método:** script bash; espera de 1000 s antes de cada request; POST a
+  `/v1/riesgo-cardiovascular`. El cuerpo enviado no consta en el registro disponible.
+- **Resultados crudos** (umbral convencional del autor: 20 s; HTTP 200 con `t ≥ 20 s`
+  se clasifica como arranque en frío; HTTP 200 con `t < 20 s` como «no frío probable»;
+  HTTP distinto de 200 como fallida; sin resultado como incompleta):
+
+  | Fecha y muestra | HTTP | t (s) | Clasificación |
+  |---|---:|---:|---|
+  | 2026-11-13 17:17:46 -05:00, 1 | 200 | 82.576296 | Arranque en frío |
+  | 2026-11-13 17:35:49 -05:00, 2 | 200 | 44.710789 | Arranque en frío |
+  | 2026-11-13 17:53:14 -05:00, 3 | 200 | 42.379184 | Arranque en frío |
+  | 2026-11-13 18:10:36 -05:00, 4 | 200 | 43.139549 | Arranque en frío |
+  | 2026-11-13, 5 | — | — | Incompleta (sin resultado) |
+
+- Frías: rango 42.379184–82.576296 s; n=4.
+- Serie anterior (2026-10-22; BITACORA.md:31): 62,9 / 47,8 / 53,2 s; n=3.
